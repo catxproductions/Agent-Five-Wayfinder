@@ -1,0 +1,382 @@
+AGENT-FIVE-WAYFINDER
+PROJECT PLANNING DOCUMENT
+Version: 0.1
+Status: PLANNING ONLY
+Repository: catxproductions/Agent-Five-Wayfinder
+Primary language: Nexius
+
+============================================================
+1. PROJECT VISION
+============================================================
+
+Agent-Five-Wayfinder is an experimental autonomous-agent model built
+primarily in Nexius.
+
+The goal is to explore whether Nexius can serve as the native
+programming foundation for an agent that can perceive an environment,
+choose actions, learn from outcomes, retain useful experience, and
+pursue goals over time.
+
+Wayfinder is a separate model line. It should not simply copy the
+internal design of Agent-Five-Nexus. The two models may share ideas
+and test environments, but Wayfinder should develop its own
+architecture so their strengths and limitations can be compared.
+
+Core principle:
+The agent should make decisions from its own internal state and
+learn from the consequences of its actions. It should not be reduced
+to a prompt-response wrapper around an external language model.
+
+This document records plans and design proposals. It does not claim
+that any proposed system has already been implemented.
+
+============================================================
+2. DESIGN GOALS
+============================================================
+
+1. Nexius-native:
+   Implement the agent's decision logic in Nexius wherever the
+   language currently supports it.
+
+2. Autonomous behavior:
+   The agent should repeatedly observe, decide, act, and evaluate
+   outcomes without requiring a new user prompt for every action.
+
+3. Learn from experience:
+   The model should be able to adjust its behavior using feedback
+   from the environment.
+
+4. Persistent identity and state:
+   Important model parameters and selected memories should be
+   saveable and reloadable between sessions.
+
+5. Inspectable decisions:
+   Provide useful telemetry showing observations, selected actions,
+   rewards, internal state, and learning progress.
+
+6. Modular architecture:
+   Perception, decision-making, memory, learning, and action
+   execution should be separable systems.
+
+7. Measurable progress:
+   Evaluate Wayfinder using repeatable tasks and recorded metrics,
+   not only visual demonstrations.
+
+============================================================
+3. PROPOSED SYSTEM ARCHITECTURE
+============================================================
+
+A. WAYFINDER CORE
+   Coordinates the agent's main decision cycle:
+   observe -> process -> decide -> act -> evaluate -> repeat.
+
+B. NEURAL CORE
+   Uses the Nexius neural module for trainable decision-making.
+   Initial experiments should use a small, understandable network.
+   Network size should increase only when measurements show that
+   additional capacity is useful.
+
+C. PERCEPTION
+   Converts the environment into a structured set of observations.
+   Examples:
+   - Distance to the goal.
+   - Distance and direction to obstacles.
+   - Current position and movement.
+   - Available energy or action budget.
+   - Recent success or failure signals.
+   - Relevant properties of nearby agents or objects.
+
+D. MEMORY
+   Stores selected information from previous experiences.
+   Proposed memory categories:
+   - Working state: information needed for the current decision.
+   - Episodic records: concise records of important past events.
+   - Learned preferences: behavior patterns supported by repeated
+     outcomes.
+   - Goal state: current objective and progress.
+
+   Memory should have limits, clear retrieval rules, and a way to
+   discard outdated or low-value records. Do not assume that simply
+   storing more data makes the agent more intelligent.
+
+E. LEARNING
+   Evaluates outcomes and adjusts the neural model.
+   The initial implementation may use Nexius reward/correction
+   feedback, but this must be treated as an experimental learning
+   mechanism rather than a complete reinforcement-learning system.
+
+F. ACTION SYSTEM
+   Converts the model's outputs into permitted environment actions.
+   The action layer should validate and constrain outputs before
+   applying them.
+
+G. PERSISTENCE
+   Proposed save/load support for:
+   - Neural weights and biases.
+   - Model configuration and version.
+   - Selected memory records.
+   - Training counters and evaluation summaries.
+
+H. OBSERVABILITY
+   Exposes a live view of:
+   - Current observations.
+   - Neural inputs and outputs.
+   - Chosen action.
+   - Reward or correction signal.
+   - Goal progress.
+   - Memory retrieval.
+   - Training and evaluation statistics.
+
+============================================================
+4. INITIAL EXPERIMENT: WAYFINDER NAVIGATION
+============================================================
+
+The first prototype should use a simple 2D environment.
+
+Environment:
+- A bounded canvas.
+- One controllable agent.
+- A goal location.
+- Static obstacles.
+- Optional energy or action budget.
+- A resettable world state.
+
+Initial observations:
+- Goal direction and distance.
+- Nearest obstacle direction and distance.
+- Agent movement or velocity.
+- Boundary proximity.
+- Current energy.
+- A small amount of recent-action context.
+
+Initial actions:
+- Move forward.
+- Turn left.
+- Turn right.
+- Brake or wait.
+
+The action set should remain small during the first experiment.
+This makes it easier to determine whether learning is working.
+
+Success condition:
+The agent reaches the goal while avoiding obstacles and using
+reasonable movement.
+
+Failure conditions:
+- Repeatedly colliding with obstacles.
+- Becoming stuck.
+- Failing to make measurable progress.
+- Exhausting its action budget before reaching the goal.
+
+The environment should support deterministic test layouts so
+different model versions can be compared fairly.
+
+============================================================
+5. DECISION CYCLE
+============================================================
+
+Proposed high-level cycle:
+
+1. Read the current environment state.
+2. Convert that state into normalized neural inputs.
+3. Retrieve relevant memory, if available.
+4. Run the neural model.
+5. Interpret the outputs as candidate actions.
+6. Validate the selected action.
+7. Apply the action to the environment.
+8. Measure the result.
+9. Calculate a reward or correction signal.
+10. Record a concise experience.
+11. Repeat until stopped or the episode ends.
+
+Important:
+The model should receive the result of its action before its next
+decision. Avoid training on stale observations or accidentally
+crediting an action for an outcome caused by a different action.
+
+============================================================
+6. REWARD DESIGN
+============================================================
+
+Reward signals should encourage useful progress without allowing
+one easy metric to dominate all behavior.
+
+Potential positive signals:
+- Reaching the goal.
+- Reducing distance to the goal.
+- Making progress through a difficult route.
+- Completing a task efficiently.
+
+Potential negative signals:
+- Obstacle collision.
+- Repeatedly choosing ineffective actions.
+- Remaining stuck.
+- Wasting energy or action budget.
+- Leaving the valid environment.
+
+Reward values and scaling must be tested. A poorly designed reward
+function can teach unintended behavior, such as moving in circles
+to collect repeated progress rewards.
+
+Use episode-level evaluation in addition to immediate rewards.
+
+============================================================
+7. NEXIUS INTEGRATION
+============================================================
+
+The current Nexius neural module provides a starting point:
+- Model input layers.
+- Configurable hidden layers.
+- Output layers mapped to Nexius variables.
+- Assembly and inference.
+- Observation history.
+- Reward and correction feedback.
+
+Known current limitations to account for:
+- Neural weights are not currently persisted by the existing
+  module.
+- The current reward/correction mechanism is a simplified,
+  global feedback adjustment, not full action-specific
+  reinforcement learning.
+- Repeated inference and feedback must be sequenced carefully.
+- Memory persistence and retrieval need to be designed separately.
+
+Before relying on any feature, verify its behavior against the
+current Nexius compiler and neural module.
+
+Potential future Nexius improvements:
+- Native model save/load.
+- More expressive data structures for memory.
+- Better action-specific learning and credit assignment.
+- Reproducible random seeds.
+- Model introspection and training telemetry.
+- Safe module interfaces for environment interaction.
+
+These are proposals, not assumptions about current language support.
+
+============================================================
+8. DEVELOPMENT PHASES
+============================================================
+
+PHASE 0 - SPECIFICATION
+- Confirm the purpose and boundaries of Wayfinder.
+- Define the first environment and success criteria.
+- Agree on the initial neural inputs and outputs.
+- Document current Nexius limitations.
+
+PHASE 1 - MINIMAL AGENT
+- Create the main Nexius program.
+- Build a small neural network.
+- Connect observations to inputs.
+- Connect outputs to a constrained action system.
+- Demonstrate a complete observe-decide-act loop.
+
+PHASE 2 - TRAINING EXPERIMENT
+- Add measurable rewards and corrections.
+- Run repeatable episodes.
+- Track success rate, collisions, completion time, and reward.
+- Compare an untrained model with trained checkpoints.
+
+PHASE 3 - MEMORY
+- Add short-term working state.
+- Add concise episodic records.
+- Test whether retrieved memories improve performance.
+- Measure memory usefulness rather than memory volume.
+
+PHASE 4 - PERSISTENCE
+- Define a versioned model format.
+- Save and load weights and biases.
+- Save selected memories and training metadata.
+- Verify that a reloaded model behaves consistently.
+
+PHASE 5 - MULTI-AGENT EXPERIMENTS
+- Introduce other agents only after single-agent behavior is
+  measurable.
+- Begin with observation and non-competitive interaction.
+- Later test cooperation or competition using controlled rules.
+
+PHASE 6 - MODEL COMPARISON
+- Compare Wayfinder with Agent-Five-Nexus on identical tasks.
+- Use the same environment layouts and evaluation conditions.
+- Record both strengths and weaknesses.
+- Avoid declaring a winner based on a single run.
+
+============================================================
+9. EVALUATION METRICS
+============================================================
+
+Record at least:
+- Goal completion rate.
+- Average steps to completion.
+- Average distance traveled.
+- Obstacle collision count.
+- Stuck or timeout rate.
+- Energy/action-budget efficiency.
+- Reward per episode.
+- Performance across unseen layouts.
+- Performance before and after saving/reloading.
+- Training stability across multiple runs.
+
+A useful improvement should appear across repeated trials, not
+only in one successful demonstration.
+
+============================================================
+10. ENGINEERING RULES
+============================================================
+
+- Keep the first prototype small and testable.
+- Separate model logic from environment physics.
+- Keep a clear distinction between observations, actions, and
+  rewards.
+- Normalize inputs consistently.
+- Validate outputs before applying actions.
+- Record model versions and experiment settings.
+- Preserve baseline checkpoints for comparison.
+- Do not silently change reward rules between comparisons.
+- Do not describe a model as learning unless tests demonstrate
+  measurable improvement.
+- Keep experimental features clearly labeled.
+- Make no changes to Agent-Five-Nexus as part of Wayfinder work
+  unless explicitly requested.
+
+============================================================
+11. OPEN DESIGN QUESTIONS
+============================================================
+
+1. Should Wayfinder begin as a navigation agent, or should its
+   first environment be a more general sandbox?
+
+2. Should the first neural network be a compact feed-forward
+   network, or should we plan for recurrent state from the start?
+
+3. What information should be stored in memory, and what should
+   remain in the live environment state?
+
+4. Should learning happen after every action, after each episode,
+   or through a combination of both?
+
+5. What is the desired balance between exploration and reliable
+   goal completion?
+
+6. Should Wayfinder eventually support multiple specialized
+   neural models coordinated by a central controller?
+
+7. What level of compatibility should it maintain with
+   Agent-Five-Nexus?
+
+============================================================
+12. FIRST RECOMMENDED MILESTONE
+============================================================
+
+Build a minimal Nexius-powered navigation agent that can:
+- Read live environment observations.
+- Run its own neural network.
+- Select and execute an action.
+- Receive feedback from the environment.
+- Repeat the cycle without user intervention.
+- Display enough telemetry to inspect its behavior.
+
+Do not add complex memory, multi-agent behavior, or advanced
+learning algorithms until this baseline works reliably.
+
+END OF DOCUMENT
