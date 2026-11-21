@@ -71,31 +71,31 @@
     drawWorld();
   }
 
-  function nearestObstacle() {
+  function nearestObstacle(agent=state.agent, obstacleSet=obstacles) {
     let best = { dx:0, dy:0, clearance:240, distance:240 };
-    for (const box of obstacles) {
-      const px = clamp(state.agent.x, box.x, box.x+box.w);
-      const py = clamp(state.agent.y, box.y, box.y+box.h);
-      let dx = px-state.agent.x, dy = py-state.agent.y;
+    for (const box of obstacleSet) {
+      const px = clamp(agent.x, box.x, box.x+box.w);
+      const py = clamp(agent.y, box.y, box.y+box.h);
+      let dx = px-agent.x, dy = py-agent.y;
       let d = length(dx,dy);
       if (d < 0.001) {
         const sides = [
-          {d:Math.abs(state.agent.x-box.x),x:-1,y:0},
-          {d:Math.abs(box.x+box.w-state.agent.x),x:1,y:0},
-          {d:Math.abs(state.agent.y-box.y),x:0,y:-1},
-          {d:Math.abs(box.y+box.h-state.agent.y),x:0,y:1}
+          {d:Math.abs(agent.x-box.x),x:-1,y:0},
+          {d:Math.abs(box.x+box.w-agent.x),x:1,y:0},
+          {d:Math.abs(agent.y-box.y),x:0,y:-1},
+          {d:Math.abs(box.y+box.h-agent.y),x:0,y:1}
         ].sort((a,b)=>a.d-b.d);
         dx=sides[0].x;dy=sides[0].y;d=0;
       }
-      if (d < best.distance) best = {dx,dy,distance:d,clearance:Math.max(0,d-state.agent.radius)};
+      if (d < best.distance) best = {dx,dy,distance:d,clearance:Math.max(0,d-agent.radius)};
     }
     return best;
   }
 
-  function updateSensors(vars, silent=false) {
+  function updateSensors(vars, silent=false, obstacleSet=obstacles) {
     const a = state.agent, goal = state.goal;
     const gx=goal.x-a.x, gy=goal.y-a.y, gd=length(gx,gy)||1;
-    const obstacle=nearestObstacle(), od=length(obstacle.dx,obstacle.dy)||1;
+    const obstacle=nearestObstacle(a,obstacleSet), od=length(obstacle.dx,obstacle.dy)||1;
     const isContactingSomething = a.contactingSomething ? 1 : 0;
     const boundary=Math.min(a.x,a.y,WORLD.width-a.x,WORLD.height-a.y)-a.radius;
     const values = [
@@ -132,8 +132,8 @@
     $("outAvoidance").textContent=outputs[3].toFixed(2);
   }
 
-  function collideWithObstacle(box) {
-    const a=state.agent;
+  function collideWithObstacle(box, agent=state.agent) {
+    const a=agent;
     const px=clamp(a.x,box.x,box.x+box.w), py=clamp(a.y,box.y,box.y+box.h);
     let dx=a.x-px,dy=a.y-py,d=length(dx,dy);
     if(d>=a.radius)return false;
@@ -156,11 +156,11 @@
     return true;
   }
 
-  function randomFreePoint(margin) {
-    for(let attempt=0;attempt<100;attempt++){
+  function randomFreePoint(margin, obstacleSet=obstacles, fromAgent=state.agent) {
+    for(let attempt=0;attempt<160;attempt++){
       const p={x:margin+Math.random()*(WORLD.width-2*margin),y:margin+Math.random()*(WORLD.height-2*margin)};
-      const blocked=obstacles.some(o=>p.x>o.x-30&&p.x<o.x+o.w+30&&p.y>o.y-30&&p.y<o.y+o.h+30);
-      if(!blocked&&length(p.x-state.agent.x,p.y-state.agent.y)>130)return p;
+      const blocked=obstacleSet.some(o=>p.x>o.x-30&&p.x<o.x+o.w+30&&p.y>o.y-30&&p.y<o.y+o.h+30);
+      if(!blocked&&length(p.x-fromAgent.x,p.y-fromAgent.y)>130)return p;
     }
     return {x:WORLD.width-75,y:WORLD.height-70};
   }
@@ -190,18 +190,30 @@
     return copy;
   }
 
-  function createEvolutionCandidate(policy, index) {
+  function createIndependentObstacleSet() {
+    // Give each candidate independently offset geometry based on the active layout.
+    return obstacles.map(box=>{
+      const x=clamp(box.x+(Math.random()-.5)*150,35,WORLD.width-box.w-35);
+      const y=clamp(box.y+(Math.random()-.5)*130,35,WORLD.height-box.h-35);
+      return {x,y,w:box.w,h:box.h};
+    }).filter(box=>!(START.x>box.x-35&&START.x<box.x+box.w+35&&
+      START.y>box.y-35&&START.y<box.y+box.h+35));
+  }
+
+  function resetEvolutionCandidate(candidate,index) {
     const start={x:clamp(START.x+(Math.random()-.5)*24,35,WORLD.width-35),y:clamp(START.y+(Math.random()-.5)*24,35,WORLD.height-35)};
-    return {
-      id:nextEvolutionAgentId++,
-      policy:clonePolicy(policy),
-      x:start.x,y:start.y,vx:0,vy:0,radius:11,energy:100,
-      goal:{x:state.goal.x,y:state.goal.y,radius:14},
-      goalsCollected:0,collisions:0,steps:0,elapsed:0,
-      bestDistance:Infinity,lastDistance:Infinity,
-      contactingSomething:false,isSuccessor:false,
-      fitness:0,index
-    };
+    candidate.x=start.x;candidate.y=start.y;candidate.vx=0;candidate.vy=0;
+    candidate.radius=11;candidate.energy=100;candidate.obstacles=createIndependentObstacleSet();
+    candidate.goal=randomFreePoint(45,candidate.obstacles,candidate);candidate.goal.radius=14;
+    candidate.goalsCollected=0;candidate.collisions=0;candidate.steps=0;candidate.elapsed=0;
+    candidate.initialDistance=length(candidate.goal.x-candidate.x,candidate.goal.y-candidate.y);
+    candidate.bestDistance=candidate.initialDistance;candidate.lastDistance=candidate.initialDistance;
+    candidate.contactingSomething=false;candidate.eliminated=false;candidate.index=index;
+    return candidate;
+  }
+
+  function createEvolutionCandidate(policy,index) {
+    return resetEvolutionCandidate({id:nextEvolutionAgentId++,policy:clonePolicy(policy),isSuccessor:false},index);
   }
 
   function seedEvolutionPopulation(runtime) {
@@ -228,12 +240,13 @@
     const savedAgent=state.agent,savedGoal=state.goal;
     state.agent=candidate;state.goal=candidate.goal;
     const vars=Object.create(null);
-    updateSensors(vars,true);
+    updateSensors(vars,true,candidate.obstacles);
     state.agent=savedAgent;state.goal=savedGoal;
     return vars;
   }
 
   function candidateStep(candidate,dt,runtime) {
+    if(candidate.eliminated)return candidate.goalsCollected;
     runtime.importWeights("Wayfinder",candidate.policy);
     const vars=candidateSensors(candidate);
     const outputs=runtime.run("Wayfinder",vars);
@@ -244,7 +257,7 @@
     const avoidance=clamp(Number(vars.avoidanceGain)||0.5,0,1);
     const savedAgent=state.agent,savedGoal=state.goal;
     state.agent=candidate;state.goal=candidate.goal;
-    const sensor=nearestObstacle();
+    const sensor=nearestObstacle(candidate,candidate.obstacles);
     let ax=tx,ay=ty;
     if(sensor.clearance<125){
       const away=normalized(-sensor.dx,-sensor.dy);
@@ -262,7 +275,7 @@
     if(speed>210){candidate.vx=candidate.vx/speed*210;candidate.vy=candidate.vy/speed*210;}
     candidate.x+=candidate.vx*dt;candidate.y+=candidate.vy*dt;
     let hit=false;
-    for(const box of obstacles)if(collideWithObstacle(box))hit=true;
+    for(const box of candidate.obstacles)if(collideWithObstacle(box,candidate))hit=true;
     const r=candidate.radius;
     if(candidate.x<r){candidate.x=r;candidate.vx=Math.abs(candidate.vx)*.35;hit=true;}
     if(candidate.x>WORLD.width-r){candidate.x=WORLD.width-r;candidate.vx=-Math.abs(candidate.vx)*.35;hit=true;}
@@ -281,11 +294,13 @@
     if(after<candidate.radius+candidate.goal.radius){
       candidate.goalsCollected++;
       candidate.energy=Math.min(100,candidate.energy+28);
-      candidate.goal=randomFreePoint(45);
+      candidate.goal=randomFreePoint(45,candidate.obstacles,candidate);
       candidate.goal.radius=14;
       feedback=1;strength=1;
-      candidate.lastDistance=distanceToGoal();
+      candidate.lastDistance=length(candidate.goal.x-candidate.x,candidate.goal.y-candidate.y);
     }
+    // Zero energy only eliminates an agent before its first successful goal.
+    if(candidate.energy<=0&&candidate.goalsCollected===0)candidate.eliminated=true;
     if(state.training&&feedback>0)runtime.reward("Wayfinder",strength);
     else if(state.training&&feedback<0)runtime.correct("Wayfinder",strength);
     candidate.policy=runtime.exportWeights("Wayfinder");
@@ -294,15 +309,14 @@
   }
 
   function selectTimeoutWinner() {
-    const weighted=state.evolutionPopulation.map(candidate=>{
-      const progress=Number.isFinite(candidate.bestDistance)?Math.max(0,1-candidate.bestDistance/Math.hypot(WORLD.width,WORLD.height)):0;
-      const weight=Math.pow(candidate.goalsCollected+1,2)*(1+progress*.65)/(1+candidate.collisions*.015);
-      return {candidate,weight:Math.max(.01,weight)};
-    });
-    const total=weighted.reduce((sum,item)=>sum+item.weight,0);
-    let ticket=Math.random()*total;
-    for(const item of weighted){ticket-=item.weight;if(ticket<=0)return item.candidate;}
-    return weighted[weighted.length-1].candidate;
+    // Original Agent Five priority: goal count, measured goal progress, energy.
+    return state.evolutionPopulation.slice().sort((a,b)=>{
+      if(b.goalsCollected!==a.goalsCollected)return b.goalsCollected-a.goalsCollected;
+      const progressA=Math.max(0,a.initialDistance-a.bestDistance);
+      const progressB=Math.max(0,b.initialDistance-b.bestDistance);
+      if(Math.abs(progressB-progressA)>0.0001)return progressB-progressA;
+      return b.energy-a.energy;
+    })[0]||null;
   }
 
   function beginNextGeneration(winner,reason) {
@@ -311,21 +325,15 @@
     state.evolutionSuccessorId=winner.id;
     state.evolutionLastWinnerId=winner.id;
     state.evolutionCompleted++;
+    const winningGoals=winner.goalsCollected;
     const elitePolicy=clonePolicy(winner.policy);
     const count=state.evolutionPopulationSize;
-    const mutationRate=reason==="timeout"?Math.min(.16,state.evolutionMutationRate*1.25):state.evolutionMutationRate;
-    // Keep the actual winning candidate as the elite; reset its episode state,
-    // but preserve its identity and exact learned parameter checkpoint.
-    winner.x=START.x;winner.y=START.y;winner.vx=0;winner.vy=0;winner.energy=100;
-    winner.goal={x:state.goal.x,y:state.goal.y,radius:14};
-    winner.goalsCollected=0;winner.collisions=0;winner.steps=0;winner.elapsed=0;
-    winner.bestDistance=length(winner.goal.x-winner.x,winner.goal.y-winner.y);
-    winner.lastDistance=winner.bestDistance;winner.contactingSomething=false;
-    winner.isSuccessor=true;winner.index=0;
+    // Keep the winning candidate and exact policy as elite, but give it a fresh arena.
+    resetEvolutionCandidate(winner,0);
+    winner.isSuccessor=true;
     const next=[winner];
     for(let i=1;i<count;i++){
-      const child=mutatePolicy(elitePolicy,mutationRate);
-      next.push(createEvolutionCandidate(child,i));
+      next.push(createEvolutionCandidate(mutatePolicy(elitePolicy,state.evolutionMutationRate),i));
     }
     state.evolutionPopulation=next;
     state.evolutionGeneration++;
@@ -333,7 +341,7 @@
     state.evolutionBestGoals=0;
     state.evolutionBestDistance=Infinity;
     addConsole("Generation "+(state.evolutionGeneration-1)+" successor: Agent #"+winner.id+
-      " ("+winner.goalsCollected+" goals). "+reason+". Elite retained; "+(count-1)+" mutated descendants created.","console-good");
+      " ("+winningGoals+" goals). "+reason+". Unchanged elite retained; "+(count-1)+" mutated descendants created.","console-good");
     updateEvolutionReadouts();
   }
 
@@ -368,8 +376,18 @@
       draw.strokeStyle=agent.isSuccessor?"#e5bd4f":"#34465a";draw.lineWidth=1;draw.strokeRect(x+.5,y+.5,tileW-1,tileH-1);
       draw.fillStyle="#b9c8d8";draw.font="10px ui-monospace,monospace";draw.fillText("#"+agent.id,x+6,y+12);
       draw.fillStyle="#74d8bd";draw.fillText(agent.goalsCollected+" / 5",x+tileW-31,y+12);
+      const miniX=x+6,miniY=y+19,miniW=tileW-12,miniH=tileH-30;
+      (agent.obstacles||[]).forEach(box=>{
+        draw.fillStyle="#647386";
+        draw.fillRect(miniX+(box.x/WORLD.width)*miniW,miniY+(box.y/WORLD.height)*miniH,
+          Math.max(1,(box.w/WORLD.width)*miniW),Math.max(1,(box.h/WORLD.height)*miniH));
+      });
+      if(agent.goal){
+        draw.beginPath();draw.arc(miniX+(agent.goal.x/WORLD.width)*miniW,miniY+(agent.goal.y/WORLD.height)*miniH,2.2,0,Math.PI*2);
+        draw.fillStyle="#74d8bd";draw.fill();
+      }
       draw.fillStyle="#ef343b";draw.beginPath();
-      draw.arc(x+6+(agent.x/WORLD.width)*(tileW-12),y+20+(agent.y/WORLD.height)*(tileH-28),3.2,0,Math.PI*2);draw.fill();
+      draw.arc(miniX+(agent.x/WORLD.width)*miniW,miniY+(agent.y/WORLD.height)*miniH,3.2,0,Math.PI*2);draw.fill();
       draw.fillStyle="#3a4a5d";draw.fillRect(x+6,y+tileH-8,tileW-12,3);
       draw.fillStyle=agent.energy<25?"#e87979":"#74d8bd";
       draw.fillRect(x+6,y+tileH-8,(tileW-12)*agent.energy/100,3);
@@ -490,7 +508,8 @@
     for(let x=20;x<WORLD.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WORLD.height);ctx.stroke();}
     for(let y=20;y<WORLD.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD.width,y);ctx.stroke();}
     ctx.strokeStyle="#40505f";ctx.lineWidth=2;ctx.strokeRect(1,1,WORLD.width-2,WORLD.height-2);
-    for(const o of obstacles){
+    const activeObstacles=state.agent.obstacles||obstacles;
+    for(const o of activeObstacles){
       ctx.fillStyle="#303c49";ctx.strokeStyle="#596a7b";ctx.lineWidth=1.4;
       ctx.beginPath();ctx.roundRect(o.x,o.y,o.w,o.h,5);ctx.fill();ctx.stroke();
       ctx.fillStyle="rgba(255,255,255,.035)";ctx.fillRect(o.x+5,o.y+5,Math.max(0,o.w-10),3);
@@ -620,7 +639,7 @@
       appearance:"solid red circle",movement:"continuous X/Y thrust with braking",
       evolution:{enabled:state.evolutionEnabled,generation:state.evolutionGeneration,populationSize:state.evolutionPopulationSize,completedGenerations:state.evolutionCompleted,eliteAgentId:state.evolutionSuccessorId},
       metrics:{goals:state.goals,collisions:state.collisions,steps:state.steps,elapsedSeconds:Number(state.elapsed.toFixed(2)),energy:state.agent.energy},
-      note:"This export contains run metrics only. The current Nexius neural module does not expose model-weight serialization."
+      note:"This export contains run metrics only; neural weights remain session-local."
     };
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);const link=document.createElement("a");
