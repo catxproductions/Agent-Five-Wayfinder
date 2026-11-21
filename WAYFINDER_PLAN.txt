@@ -1,7 +1,7 @@
 AGENT-FIVE-WAYFINDER
 PROJECT PLANNING DOCUMENT
-Version: 0.1
-Status: PLANNING ONLY
+Version: 1.0.0
+Status: IMPLEMENTATION IN PROGRESS
 Repository: catxproductions/Agent-Five-Wayfinder
 Primary language: Nexius
 
@@ -150,10 +150,12 @@ Initial observations:
 - A small amount of recent-action context.
 
 Initial actions:
-- Move forward.
-- Turn left.
-- Turn right.
-- Brake or wait.
+- Continuous X-axis thrust.
+- Continuous Y-axis thrust.
+- Continuous braking.
+- Adaptive obstacle-avoidance gain.
+
+The agent retains the original Agent Five continuous two-axis movement style. It is rendered as a solid red circle, without a grid or cardinal-direction action system.
 
 The action set should remain small during the first experiment.
 This makes it easier to determine whether learning is working.
@@ -442,11 +444,10 @@ Layer breakdown:
 - Hidden layer 7:     8 neurons
 - Output layer:       4 neurons
 
-This gives Wayfinder seven hidden layers and 90 neurons in total.
+This gives Wayfinder seven hidden layers and 100 neurons in total.
 
 Assuming fully connected dense layers with one bias per neuron
-after the input layer, the proposed network contains approximately
-1,223 trainable parameters:
+after the input layer, the proposed network contains 1,313 trainable parameters (1,223 weights and 90 biases):
 - Input to hidden 1: 165
 - Hidden 1 to hidden 2: 240
 - Hidden 2 to hidden 3: 224
@@ -456,9 +457,7 @@ after the input layer, the proposed network contains approximately
 - Hidden 6 to hidden 7: 88
 - Hidden 7 to output: 36
 
-The parameter count is an architecture estimate. It assumes
-ordinary fully connected layers and biases, and should be checked
-against the actual Nexius neural module when implemented.
+The parameter count follows the current Nexius neural module's dense-layer implementation: 1,223 connection weights plus 90 biases, for 1,313 trainable parameters.
 
 This is the requested starting topology, not a claim that a deeper
 network is automatically more capable. The seven hidden layers
@@ -487,15 +486,12 @@ large values do not overwhelm smaller signals.
 
 Proposed output mapping:
 
-  1. move_forward
-  2. turn_left
-  3. turn_right
-  4. brake
+  1. thrust_x          (continuous signed X-axis thrust)
+  2. thrust_y          (continuous signed Y-axis thrust)
+  3. braking           (continuous braking amount)
+  4. avoidance_gain    (adaptive obstacle-avoidance assistance)
 
-The action system should interpret outputs consistently. For the
-first experiment, select the highest-valued valid action rather
-than activating every output at once. If outputs are close, use a
-deterministic tie-breaking rule so test runs are reproducible.
+The first three outputs preserve the original Agent Five continuous thrust/braking interface. The fourth output extends that interface with an adaptive avoidance gain. Outputs are continuous values, not mutually exclusive action labels.
 
 The environment action layer, not the neural network, remains
 responsible for collision checks, world boundaries, and valid
@@ -852,3 +848,19 @@ Once these are settled, the plan will be detailed enough to
 begin the first implementation without guessing at core behavior.
 
 END OF DOCUMENT
+
+
+============================================================
+26. AFW-1.0.0 IMPLEMENTATION RECORD
+============================================================
+
+The first runnable prototype is being implemented in this repository.
+It bundles the current Nexius compiler and neural module so the
+Wayfinder program can execute independently of the Nexius editor.
+
+Canonical appearance: solid red circle.
+Movement: continuous X/Y thrust and braking, with an additional
+adaptive obstacle-avoidance gain as the fourth Wayfinder output.
+The current neural module uses simplified global reward/correction
+feedback and does not expose weight serialization; those limits
+must remain visible in the UI and documentation.
