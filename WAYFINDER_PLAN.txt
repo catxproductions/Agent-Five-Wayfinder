@@ -882,3 +882,32 @@ This value is updated from the environment's collision/contact check.
 Updated topology: 11-15-15-14-14-10-10-8-4.
 Total neurons: 101. Connection weights: 1,148. Biases: 90.
 Total trainable parameters: 1,238.
+
+
+============================================================
+28. GENERATIONAL TRAINING IMPLEMENTATION
+============================================================
+
+Wayfinder now includes a winner-based evolutionary training mode
+modeled on the original Agent Five generational cycle.
+
+- Population size is configurable from 15 to 300 candidates.
+- Every candidate has independent movement, energy, goal progress,
+  collision counts, and a neural parameter checkpoint.
+- The first candidate to collect 5 goals becomes the successor.
+- If no candidate reaches the threshold in 120 seconds, a
+  weighted fallback chooses a successor, strongly prioritizing
+  goals collected, then best distance progress, then fewer hits.
+- The successor is retained unchanged as the elite in the next
+  generation.
+- All remaining candidates are created as mutated copies of the
+  successor's neural weights.
+- Nexius neural runtime supports validated weight checkpoint
+  export/import, allowing the population to share one execution
+  runtime while retaining separate policies.
+- A population overview and generation telemetry are displayed.
+
+This is evolutionary selection with mutation. It does not use
+weight crossover, and it is not PPO. Training feedback is still
+the current Nexius reward/correction mechanism.
+
