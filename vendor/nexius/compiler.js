@@ -248,6 +248,7 @@
     const vars = Object.create(null), functions = Object.create(null);
     const loadedModules = new Set();
     const neuralRuntime = window.NexiusModules && window.NexiusModules.neural ? window.NexiusModules.neural.createRuntime() : null;
+    if (neuralRuntime && typeof hooks.onNeuralRuntime === "function") hooks.onNeuralRuntime(neuralRuntime);
     let stopped = false, steps = 0;
     const keyStates = new Map(), keyHandlers = [], trackedKeys = new Set(), eventWaiters = [];
     let eventQueue = Promise.resolve(), eventError = null;
