@@ -427,15 +427,45 @@ The first network should be deliberately small. A compact network
 will be easier to debug and will make it easier to understand
 whether the input and reward design are useful.
 
-Proposed initial topology:
+CONFIRMED PROPOSED INITIAL TOPOLOGY:
 
-    10 input neurons
-    12 hidden neurons
-    8 hidden neurons
-    4 output neurons
+    10 - 15 - 15 - 14 - 14 - 10 - 10 - 8 - 4
 
-This is a starting experiment, not a permanent architecture.
-It should be adjusted only after baseline measurements.
+Layer breakdown:
+- Input layer:       10 neurons
+- Hidden layer 1:    15 neurons
+- Hidden layer 2:    15 neurons
+- Hidden layer 3:    14 neurons
+- Hidden layer 4:    14 neurons
+- Hidden layer 5:    10 neurons
+- Hidden layer 6:    10 neurons
+- Hidden layer 7:     8 neurons
+- Output layer:       4 neurons
+
+This gives Wayfinder seven hidden layers and 90 neurons in total.
+
+Assuming fully connected dense layers with one bias per neuron
+after the input layer, the proposed network contains approximately
+1,223 trainable parameters:
+- Input to hidden 1: 165
+- Hidden 1 to hidden 2: 240
+- Hidden 2 to hidden 3: 224
+- Hidden 3 to hidden 4: 210
+- Hidden 4 to hidden 5: 150
+- Hidden 5 to hidden 6: 110
+- Hidden 6 to hidden 7: 88
+- Hidden 7 to output: 36
+
+The parameter count is an architecture estimate. It assumes
+ordinary fully connected layers and biases, and should be checked
+against the actual Nexius neural module when implemented.
+
+This is the requested starting topology, not a claim that a deeper
+network is automatically more capable. The seven hidden layers
+should remain fixed for the first baseline experiment so results
+are attributable to a known architecture. Later architecture
+experiments can compare alternatives using the same test layouts
+and training protocol.
 
 Proposed input mapping:
 
@@ -758,7 +788,8 @@ a known-good baseline.
 
 Before coding:
 [ ] Confirm the first task is 2D navigation.
-[ ] Confirm the initial 10-input, 4-output design.
+[x] Set the proposed network topology to 10-15-15-14-14-10-10-8-4.
+[ ] Confirm the initial 10-input, 4-output observation/action design.
 [ ] Confirm the action-selection rule.
 [ ] Define the observation coordinate convention.
 [ ] Define the reward calculation.
@@ -791,7 +822,9 @@ Provisional decisions:
 - Wayfinder is a distinct model line from Agent-Five-Nexus.
 - Nexius is the primary implementation language.
 - The first experiment is a 2D navigation task.
-- The first network is compact and feed-forward.
+- The first network is feed-forward with topology
+  10-15-15-14-14-10-10-8-4 (10 inputs, seven hidden layers,
+  and 4 outputs).
 - The initial action set contains four discrete actions.
 - Memory is bounded and introduced after the baseline agent.
 - Evaluation runs do not update model parameters.
