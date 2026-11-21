@@ -3,7 +3,7 @@
 **Version:** 1.0.0  
 **Status:** Initial runnable prototype  
 **Language:** Nexius  
-**Model topology:** `10-15-15-14-14-10-10-8-4`
+**Model topology:** `11-15-15-14-14-10-10-8-4`
 
 Agent-Five-Wayfinder is a separate Nexius-native autonomous navigation experiment. It does not modify Agent-Five-Nexus.
 
@@ -19,13 +19,13 @@ Agent Five is represented by its canonical **solid red circle**. Wayfinder prese
 
 ## Network
 
-- Input: 10 normalized environment observations.
+- Input: 11 normalized environment observations, including absolute normalized goal coordinates and the binary `isContactingSomething` contact flag.
 - Hidden layers: 15, 15, 14, 14, 10, 10, 8.
 - Output: 4 continuous controls.
-- Total neurons: 100.
-- Weights: 1,223.
+- Total neurons: 101.
+- Weights: 1,238.
 - Biases: 90.
-- Trainable parameters: 1,313.
+- Trainable parameters: 1,328.
 
 ## Current limitations
 
