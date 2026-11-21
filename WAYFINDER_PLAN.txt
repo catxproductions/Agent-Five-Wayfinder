@@ -876,9 +876,9 @@ absolute goalLocationX and goalLocationY coordinates (0 to 1).
 The existing goalDistance input remains.
 
 A new numeric isContactingSomething input is 1 while the agent is
-physically contacting an obstacle or world boundary, and 0 otherwise.
+physically contacting an obstacle, the goal, or a world boundary, and 0 otherwise.
 This value is updated from the environment's collision/contact check.
 
 Updated topology: 11-15-15-14-14-10-10-8-4.
-Total neurons: 101. Connection weights: 1,238. Biases: 90.
-Total trainable parameters: 1,328.
+Total neurons: 101. Connection weights: 1,148. Biases: 90.
+Total trainable parameters: 1,238.
