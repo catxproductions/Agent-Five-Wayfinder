@@ -4,8 +4,8 @@
 
 imp.neural
 
-goalDirectionX = 0
-goalDirectionY = 0
+goalLocationX = 0
+goalLocationY = 0
 goalDistance = 1
 obstacleDirectionX = 0
 obstacleDirectionY = 0
@@ -14,6 +14,7 @@ velocityX = 0
 velocityY = 0
 boundaryProximity = 1
 energyLevel = 1
+isContactingSomething = 0
 
 thrustX = 0.5
 thrustY = 0.5
@@ -24,9 +25,9 @@ feedbackSignal = 0
 feedbackStrength = 0.2
 aiEnabled = true
 
-neural.Wayfinder.inputLayer -- (10):
-    neural.in1 = goalDirectionX
-    neural.in2 = goalDirectionY
+neural.Wayfinder.inputLayer -- (11):
+    neural.in1 = goalLocationX
+    neural.in2 = goalLocationY
     neural.in3 = goalDistance
     neural.in4 = obstacleDirectionX
     neural.in5 = obstacleDirectionY
@@ -35,6 +36,7 @@ neural.Wayfinder.inputLayer -- (10):
     neural.in8 = velocityY
     neural.in9 = boundaryProximity
     neural.in10 = energyLevel
+    neural.in11 = isContactingSomething
 --
 
 neural.Wayfinder.hidden -- (7):
@@ -56,7 +58,7 @@ neural.Wayfinder.outputLayer -- (4):
 
 neural.assemble(Wayfinder)
 output("Wayfinder 1.0.0 neural network assembled.")
-output("Topology: 10-15-15-14-14-10-10-8-4.")
+output("Topology: 11-15-15-14-14-10-10-8-4.")
 
 while -- aiEnabled == true:
     neural.run(Wayfinder)
