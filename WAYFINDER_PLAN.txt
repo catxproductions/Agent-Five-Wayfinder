@@ -379,4 +379,443 @@ Build a minimal Nexius-powered navigation agent that can:
 Do not add complex memory, multi-agent behavior, or advanced
 learning algorithms until this baseline works reliably.
 
+============================================================
+13. MODEL IDENTITY AND OPERATING PRINCIPLES
+============================================================
+
+Wayfinder should be treated as a persistent model, not merely a
+program that happens to contain a neural network.
+
+Its identity is defined by:
+- A model identifier and architecture version.
+- Its learned parameters.
+- Its current task and goal state.
+- Its permitted capabilities.
+- Its saved experience, where enabled.
+- Its evaluation history.
+
+The model should distinguish three kinds of information:
+
+A. BUILT-IN STRUCTURE
+   The program's rules, architecture, action definitions, and
+   environment interface. These are not learned memories.
+
+B. LEARNED PARAMETERS
+   Neural weights and biases changed by training.
+
+C. EXPERIENCE STATE
+   Memories, recent events, task progress, and episode summaries.
+
+Keeping these separate makes it possible to reset training without
+accidentally deleting the program's architecture, or clear memories
+without changing the learned neural parameters.
+
+Wayfinder should have explicit operating modes:
+- Development: inspectable, verbose, and easy to reset.
+- Training: learning enabled and metrics recorded.
+- Evaluation: learning disabled; parameters remain unchanged.
+- Demonstration: user-facing visualization and status reporting.
+
+Evaluation mode is important. A model must be tested without
+changing its weights during the test.
+
+============================================================
+14. PROPOSED FIRST NETWORK SPECIFICATION
+============================================================
+
+The first network should be deliberately small. A compact network
+will be easier to debug and will make it easier to understand
+whether the input and reward design are useful.
+
+Proposed initial topology:
+
+    10 input neurons
+    12 hidden neurons
+    8 hidden neurons
+    4 output neurons
+
+This is a starting experiment, not a permanent architecture.
+It should be adjusted only after baseline measurements.
+
+Proposed input mapping:
+
+  1. goal_direction_x
+  2. goal_direction_y
+  3. goal_distance
+  4. obstacle_direction_x
+  5. obstacle_direction_y
+  6. obstacle_distance
+  7. velocity_x
+  8. velocity_y
+  9. boundary_proximity
+ 10. energy_level
+
+All inputs should be normalized to documented ranges before
+entering the network. Direction values should use a consistent
+coordinate convention. Distances should be capped or scaled so
+large values do not overwhelm smaller signals.
+
+Proposed output mapping:
+
+  1. move_forward
+  2. turn_left
+  3. turn_right
+  4. brake
+
+The action system should interpret outputs consistently. For the
+first experiment, select the highest-valued valid action rather
+than activating every output at once. If outputs are close, use a
+deterministic tie-breaking rule so test runs are reproducible.
+
+The environment action layer, not the neural network, remains
+responsible for collision checks, world boundaries, and valid
+movement constraints.
+
+============================================================
+15. OBSERVATION AND ACTION CONTRACT
+============================================================
+
+The environment and the agent should communicate through a
+documented contract.
+
+OBSERVATION CONTRACT
+- The environment supplies one complete observation snapshot.
+- Every field has a defined type, range, and coordinate convention.
+- Missing or invalid values receive an explicit fallback.
+- All fields in one decision cycle refer to the same simulation
+  state.
+- The agent does not directly modify environment state while
+  constructing its observation.
+
+ACTION CONTRACT
+- The agent submits one action choice per decision cycle.
+- The environment validates the action.
+- The environment applies the action for a bounded duration or
+  one simulation step.
+- The environment returns the resulting observation and outcome.
+- Invalid actions are rejected and recorded.
+
+This separation prevents the model from accidentally changing
+the world while it is still deciding what it has observed.
+
+============================================================
+16. MEMORY DESIGN IN MORE DETAIL
+============================================================
+
+Memory should not be treated as a second neural network. It is a
+separate system that stores selected experience and makes useful
+parts available to the decision process.
+
+Initial memory record fields:
+
+- episode_id
+- step_index
+- observation_summary
+- action_taken
+- outcome_summary
+- reward_value
+- goal_progress
+- importance_score
+
+Initial retrieval strategy:
+1. Keep a short working window of recent events.
+2. Store important events as episodic records.
+3. Retrieve records that match the current situation using
+   simple, explainable matching rules.
+4. Supply only a small summary of retrieved records to the
+   decision system.
+5. Update or discard records according to measured usefulness.
+
+The first version should avoid unrestricted memory growth.
+A bounded memory with clear rules is easier to test and maintain.
+
+Memory experiments should compare:
+- No memory.
+- Recent-event working memory only.
+- Working memory plus episodic retrieval.
+
+This will show whether memory actually improves navigation.
+
+============================================================
+17. LEARNING AND CREDIT ASSIGNMENT
+============================================================
+
+A key technical challenge is determining which action caused
+which outcome.
+
+For every decision cycle, Wayfinder should preserve a record of:
+- The observation used for the decision.
+- The model output.
+- The action actually applied.
+- The resulting observation.
+- The measured reward.
+
+Feedback must correspond to the inference that produced the
+action. Do not run another inference and then accidentally apply
+the previous action's reward to the new inference.
+
+The existing Nexius reward/correction functions are useful for
+early experiments, but their simplified global adjustment may not
+reliably identify which output or action should change.
+
+Therefore, learning should proceed in stages:
+
+Stage A:
+Use simple feedback in a controlled environment and measure
+whether behavior changes in the intended direction.
+
+Stage B:
+Add action-specific outcome tracking so the system can associate
+feedback with the selected action.
+
+Stage C:
+Evaluate a more formal learning algorithm only after the
+observation/action/reward pipeline is reliable.
+
+Do not claim that Stage A is full reinforcement learning.
+
+============================================================
+18. TRAINING AND EVALUATION PROTOCOL
+============================================================
+
+Every experiment should have a recorded configuration:
+
+- Model version.
+- Network topology.
+- Initial parameter state or checkpoint identifier.
+- Environment layout identifier.
+- Random seed, if supported.
+- Reward configuration.
+- Number of episodes.
+- Evaluation mode or training mode.
+
+Recommended experiment groups:
+
+BASELINE
+Run the initial model without learning to establish its starting
+performance.
+
+TRAINING
+Allow learning across a defined number of episodes. Record
+performance at regular intervals.
+
+HELD-OUT EVALUATION
+Test the resulting model on layouts not used during training.
+Disable learning during these tests.
+
+RELOAD TEST
+Save the model, reload it, and verify that its behavior and
+parameters are preserved.
+
+A result should be considered promising only if improvements
+repeat across multiple runs and are not limited to one memorized
+layout.
+
+============================================================
+19. FAILURE ANALYSIS
+============================================================
+
+Wayfinder should classify common failures rather than treating
+every unsuccessful episode as the same problem.
+
+Suggested categories:
+- Navigation failure: the agent cannot find a route.
+- Avoidance failure: the agent repeatedly contacts obstacles.
+- Oscillation: the agent alternates between actions without
+  making progress.
+- Stagnation: the agent remains in one area.
+- Reward exploitation: the agent maximizes a reward signal
+  without completing the intended task.
+- Observation failure: inputs are missing, stale, or incorrectly
+  normalized.
+- Action failure: selected actions are invalid or not applied.
+- Learning instability: performance becomes worse or erratic
+  after updates.
+
+For each failure, retain a short diagnostic record. This will
+make debugging much more useful than simply increasing network
+size.
+
+============================================================
+20. USER INTERFACE AND INSPECTION PLAN
+============================================================
+
+The eventual Wayfinder interface should prioritize understanding
+what the model is doing.
+
+Proposed panels:
+
+WORLD VIEW
+- 2D environment.
+- Agent position and orientation.
+- Goal and obstacles.
+- Recent path.
+- Collision and boundary indicators.
+
+MODEL STATUS
+- Current model mode.
+- Episode and step count.
+- Current objective.
+- Current energy.
+- Current completion status.
+
+NEURAL INSPECTOR
+- Input values.
+- Hidden-layer activation summaries.
+- Output values.
+- Selected action.
+
+MEMORY INSPECTOR
+- Recent working-memory events.
+- Retrieved episodic records.
+- Why a record was selected.
+- Memory capacity and usage.
+
+LEARNING AND METRICS
+- Reward per episode.
+- Completion rate.
+- Collision rate.
+- Average steps to goal.
+- Training versus evaluation results.
+
+The interface should not imply that a neural activation is a
+human-readable thought. It should display activations as model
+signals and show the actual observation/action records separately.
+
+============================================================
+21. PROPOSED FILE ORGANIZATION
+============================================================
+
+The exact file layout depends on Nexius module and runtime support.
+This is a conceptual organization, not a claim that all files
+already exist.
+
+    Agent-Five-Wayfinder/
+    |
+    |-- WAYFINDER_PLAN.txt
+    |-- README.md
+    |
+    |-- nexius/
+    |   |-- main.nexius
+    |   |-- core.nexius
+    |   |-- perception.nexius
+    |   |-- decision.nexius
+    |   |-- actions.nexius
+    |   |-- learning.nexius
+    |   |-- memory.nexius
+    |
+    |-- environment/
+    |   |-- environment specification
+    |   |-- deterministic test layouts
+    |
+    |-- models/
+    |   |-- model configuration
+    |   |-- saved checkpoints
+    |
+    |-- experiments/
+    |   |-- experiment configurations
+    |   |-- evaluation results
+    |
+    |-- interface/
+        |-- runner and inspection UI
+
+The first implementation may combine several conceptual modules
+if the current Nexius compiler makes that more reliable. Separation
+of responsibilities matters more than the number of files.
+
+============================================================
+22. TECHNICAL RISKS AND MITIGATIONS
+============================================================
+
+RISK: The current learning function changes weights in a way that
+does not correspond to the action that caused the reward.
+MITIGATION: Preserve inference/action records and test feedback
+carefully before increasing training complexity.
+
+RISK: Inputs use inconsistent scales.
+MITIGATION: Define normalization ranges and test boundary values.
+
+RISK: The agent learns one fixed map instead of navigation.
+MITIGATION: Evaluate on held-out layouts and varied start/goal
+positions.
+
+RISK: Memory grows without improving behavior.
+MITIGATION: Bound memory and run controlled memory ablation tests.
+
+RISK: The UI displays misleading explanations.
+MITIGATION: Distinguish measured signals from interpretations.
+
+RISK: A saved model cannot be restored exactly.
+MITIGATION: Version the save format and test round-trip loading.
+
+RISK: The program becomes too complex to debug.
+MITIGATION: Implement one verified subsystem at a time and keep
+a known-good baseline.
+
+============================================================
+23. REVISED FIRST IMPLEMENTATION CHECKLIST
+============================================================
+
+Before coding:
+[ ] Confirm the first task is 2D navigation.
+[ ] Confirm the initial 10-input, 4-output design.
+[ ] Confirm the action-selection rule.
+[ ] Define the observation coordinate convention.
+[ ] Define the reward calculation.
+[ ] Verify the current Nexius syntax needed by the prototype.
+[ ] Decide how the runner passes observations into Nexius.
+
+Minimal prototype:
+[ ] Create a resettable deterministic environment.
+[ ] Create the Nexius neural model.
+[ ] Feed a complete observation snapshot into the model.
+[ ] Run one inference per decision cycle.
+[ ] Convert outputs into one valid action.
+[ ] Apply the action and collect the result.
+[ ] Record the observation/action/outcome sequence.
+[ ] Display the world and model telemetry.
+[ ] Test stopping, resetting, and invalid values.
+
+Learning prototype:
+[ ] Add feedback after a completed action.
+[ ] Verify feedback is applied to the correct inference.
+[ ] Compare trained and untrained checkpoints.
+[ ] Run multiple layouts and repeated trials.
+[ ] Record failure categories and evaluation metrics.
+
+============================================================
+24. CURRENT PLANNING DECISIONS
+============================================================
+
+Provisional decisions:
+- Wayfinder is a distinct model line from Agent-Five-Nexus.
+- Nexius is the primary implementation language.
+- The first experiment is a 2D navigation task.
+- The first network is compact and feed-forward.
+- The initial action set contains four discrete actions.
+- Memory is bounded and introduced after the baseline agent.
+- Evaluation runs do not update model parameters.
+- Model progress must be measured across repeated trials.
+
+These decisions remain provisional until explicitly confirmed.
+
+============================================================
+25. NEXT PLANNING SESSION
+============================================================
+
+The next design task should settle the exact first prototype
+specification:
+
+1. Confirm whether the agent is a point, circle, or directional
+   vehicle in the 2D world.
+2. Choose the movement model: grid-based or continuous.
+3. Finalize the observation values and normalization.
+4. Finalize the action-selection behavior.
+5. Define the reward calculation with example scenarios.
+6. Confirm how the Nexius runner will exchange variables with
+   the environment.
+
+Once these are settled, the plan will be detailed enough to
+begin the first implementation without guessing at core behavior.
+
 END OF DOCUMENT
