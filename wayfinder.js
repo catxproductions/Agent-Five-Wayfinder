@@ -150,6 +150,7 @@
   function applyFrame(vars, seconds) {
     if(paused||stopRequested)return;
     const dt=clamp(Number(seconds)||0.02,0.008,0.04);
+    state.feedbackCooldown=Math.max(0,state.feedbackCooldown-dt);
     const a=state.agent;
     updateOutputReadouts(vars);
     let tx=(state.lastOutput[0]*2)-1,ty=(state.lastOutput[1]*2)-1;
@@ -179,18 +180,21 @@
     if(a.x>WORLD.width-r){a.x=WORLD.width-r;a.vx=-Math.abs(a.vx)*0.35;hit=true;}
     if(a.y<r){a.y=r;a.vy=Math.abs(a.vy)*0.35;hit=true;}
     if(a.y>WORLD.height-r){a.y=WORLD.height-r;a.vy=-Math.abs(a.vy)*0.35;hit=true;}
-    if(hit){state.collisions++;vars.feedbackSignal=-1;vars.feedbackStrength=1;state.feedbackCooldown=0.2;}
-    else {
+    if(hit){
+      state.collisions++;
+      vars.feedbackSignal=state.training&&state.feedbackCooldown<=0?-1:0;
+      vars.feedbackStrength=1;
+      if(vars.feedbackSignal<0)state.feedbackCooldown=0.25;
+    }else{
       const after=distanceToGoal(),progress=before-after;
       vars.feedbackSignal=0;vars.feedbackStrength=0.15;
       if(state.training&&state.feedbackCooldown<=0&&progress>0.45){vars.feedbackSignal=1;state.feedbackCooldown=0.12;}
-      if(state.feedbackCooldown>0)state.feedbackCooldown=Math.max(0,state.feedbackCooldown-dt);
     }
     a.energy=Math.max(0,a.energy-(0.09+0.12*(Math.abs(tx)+Math.abs(ty)))*dt);
-    if(a.energy<=0){a.vx*=0.985;a.vy*=0.985;vars.feedbackSignal=-1;vars.feedbackStrength=0.5;}
+    if(a.energy<=0){a.vx*=0.985;a.vy*=0.985;if(state.training){vars.feedbackSignal=-1;vars.feedbackStrength=0.5;}}
     const goalDistance=distanceToGoal();
     if(goalDistance<a.radius+state.goal.radius){
-      state.goals++;vars.feedbackSignal=1;vars.feedbackStrength=1;
+      state.goals++;vars.feedbackSignal=state.training?1:0;vars.feedbackStrength=1;
       a.energy=Math.min(100,a.energy+28);
       state.goal=randomFreePoint(45);state.goal.radius=14;
       state.lastDistance=distanceToGoal();
@@ -283,7 +287,8 @@
       {x:245,y:90,w:70,h:160},{x:430,y:235,w:175,h:55},{x:700,y:105,w:65,h:160},
       {x:180,y:420,w:180,h:55},{x:590,y:455,w:150,h:52}
     ];
-    obstacles=candidates.filter((o,i)=>i!==Math.floor(Math.random()*candidates.length)).map(o=>({...o}));
+    const removeIndex=Math.floor(Math.random()*candidates.length);
+    obstacles=candidates.filter((o,i)=>i!==removeIndex).map(o=>({...o}));
     resetAgent();state.goal={x:850,y:500,radius:14};state.lastDistance=distanceToGoal();
     addConsole("Environment layout randomized.");
   }
