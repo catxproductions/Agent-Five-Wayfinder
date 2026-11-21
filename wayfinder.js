@@ -182,7 +182,8 @@
     if(a.x>WORLD.width-r){a.x=WORLD.width-r;a.vx=-Math.abs(a.vx)*0.35;hit=true;}
     if(a.y<r){a.y=r;a.vy=Math.abs(a.vy)*0.35;hit=true;}
     if(a.y>WORLD.height-r){a.y=WORLD.height-r;a.vy=-Math.abs(a.vy)*0.35;hit=true;}
-    a.contactingSomething=hit;
+    const touchingGoalBeforeRelocation=distanceToGoal()<=a.radius+state.goal.radius;
+    a.contactingSomething=hit||touchingGoalBeforeRelocation;
     if(hit){
       state.collisions++;
       vars.feedbackSignal=state.training&&state.feedbackCooldown<=0?-1:0;
