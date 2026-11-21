@@ -48,6 +48,22 @@
         </div>
       </section>
 
+      <section class="panel evolution-panel">
+        <div class="panel-heading"><div><span class="eyebrow">EVOLUTIONARY TRAINING</span><h2>Generational population</h2></div><span class="evolution-status" id="evolutionStatus">Single-agent mode</span></div>
+        <label class="toggle-row evolution-toggle"><span><strong>Enable generational training</strong><small>Run independent agents and evolve the successor's neural weights</small></span><input type="checkbox" id="evolutionToggle"><span class="toggle"></span></label>
+        <div class="evolution-config"><label for="evolutionPopulationSize">Population size</label><input id="evolutionPopulationSize" type="number" min="15" max="300" step="15" value="15"><small>15–300 agents</small></div>
+        <div class="evolution-stats">
+          <div><span>Generation</span><b id="evolutionGeneration">0</b></div>
+          <div><span>Population</span><b id="evolutionPopulationCount">0 / 15</b></div>
+          <div><span>Generation timer</span><b id="evolutionElapsed">0s / 120s</b></div>
+          <div><span>Elite successor</span><b id="evolutionWinner">Searching</b></div>
+          <div><span>Current leader</span><b id="evolutionBest">—</b></div>
+          <div><span>Completed generations</span><b id="evolutionCompleted">0</b></div>
+        </div>
+        <div class="population-wrap"><canvas id="populationCanvas" aria-label="Live overview of the evolutionary agent population"></canvas></div>
+        <p class="small-note">First agent to 5 goals becomes the elite. If no agent succeeds in 120 seconds, selection favors goal progress, then lower collision counts. The elite is retained unchanged; the rest are mutated descendants.</p>
+      </section>
+
       <section class="metrics-grid">
         <article class="metric panel"><span>GOALS REACHED</span><strong id="goalCount">0</strong><small>Successful arrivals</small></article>
         <article class="metric panel"><span>COLLISIONS</span><strong id="collisionCount">0</strong><small>Obstacle and boundary hits</small></article>
