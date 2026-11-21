@@ -27,6 +27,19 @@ Agent Five is represented by its canonical **solid red circle**. Wayfinder prese
 - Biases: 90.
 - Trainable parameters: 1,238.
 
+## Generational training
+
+Enable **Generational training** before starting the agent to run an evolutionary population instead of the single-agent view. Each candidate has its own position, velocity, energy, goal progress, and neural-weight checkpoint while sharing the current obstacle layout.
+
+- Population size: 15–300 agents (default 15).
+- First candidate to collect 5 goals becomes the generation successor.
+- The successor's neural weights are kept unchanged as the next generation's elite.
+- Every other candidate is initialized as a mutated copy of the successor's weights.
+- If no candidate reaches 5 goals within 120 seconds, weighted fallback selection favors goal count, then best goal-distance progress, then fewer collisions.
+- The bundled Nexius neural runtime now supports validated weight export/import so each candidate can carry an independent checkpoint.
+
+This is a winner-take-all evolutionary strategy with mutation, not crossover or PPO. The UI shows the current population, generation timer, leader, and retained elite.
+
 ## Current limitations
 
 The bundled Nexius neural module uses a simplified global reward/correction adjustment. This is an experimental feedback mechanism, not PPO or action-specific reinforcement learning. The current neural runtime also does not expose weight serialization, so model weights are session-only in this prototype. The metrics export does not contain the neural weights.
