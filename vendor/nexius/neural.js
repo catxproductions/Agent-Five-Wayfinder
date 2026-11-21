@@ -76,6 +76,39 @@
         model.feedbackCount++;
       }
       return {
+        exportWeights(name) {
+          const m=modelFor(name);
+          if(!m.assembled)throw new Error("Assemble the neural model before exporting weights.");
+          return {
+            sizes:[m.input.entries.length,...m.hidden,m.output.entries.length],
+            weights:m.weights.map(layer=>layer.map(row=>row.slice())),
+            biases:m.biases.map(layer=>layer.slice())
+          };
+        },
+        importWeights(name,snapshot) {
+          const m=modelFor(name);
+          if(!m.assembled)throw new Error("Assemble the neural model before importing weights.");
+          if(!snapshot||!Array.isArray(snapshot.weights)||!Array.isArray(snapshot.biases)||
+             snapshot.weights.length!==m.weights.length||snapshot.biases.length!==m.biases.length)
+            throw new Error("Neural weight checkpoint has an incompatible layer structure.");
+          for(let layer=0;layer<m.weights.length;layer++){
+            if(!Array.isArray(snapshot.weights[layer])||snapshot.weights[layer].length!==m.weights[layer].length||
+               !Array.isArray(snapshot.biases[layer])||snapshot.biases[layer].length!==m.biases[layer].length)
+              throw new Error("Neural weight checkpoint has an incompatible layer size.");
+            for(let neuron=0;neuron<m.weights[layer].length;neuron++){
+              if(!Array.isArray(snapshot.weights[layer][neuron])||snapshot.weights[layer][neuron].length!==m.weights[layer][neuron].length)
+                throw new Error("Neural weight checkpoint has an incompatible neuron size.");
+              const row=snapshot.weights[layer][neuron].map(Number);
+              if(row.some(value=>!Number.isFinite(value)))throw new Error("Neural checkpoint contains an invalid weight.");
+              m.weights[layer][neuron]=row;
+              const bias=Number(snapshot.biases[layer][neuron]);
+              if(!Number.isFinite(bias))throw new Error("Neural checkpoint contains an invalid bias.");
+              m.biases[layer][neuron]=bias;
+            }
+          }
+          m.lastInference=null;
+          return true;
+        },
         declareLayer(node) {
           let m=models.get(node.model);
           if(!m){m={input:null,hidden:null,output:null,assembled:false,lastInference:null,feedbackCount:0,observations:[]};models.set(node.model,m);}
