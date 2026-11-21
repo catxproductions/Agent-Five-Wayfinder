@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101318">
+  <meta name="description" content="Agent-Five-Wayfinder — a Nexius-native autonomous navigation experiment.">
+  <title>Agent-Five-Wayfinder 1.0.0</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Agent Five Wayfinder home">
+      <span class="brand-mark"></span>
+      <span><strong>AGENT FIVE</strong><small>WAYFINDER</small></span>
+    </a>
+    <div class="topbar-meta"><span class="version">AFW-1.0.0</span><span class="runtime-state" id="runtimeState"><i></i> IDLE</span></div>
+  </header>
+
+  <main class="app-shell">
+    <section class="main-column">
+      <div class="section-heading">
+        <div><span class="eyebrow">AUTONOMOUS NAVIGATION EXPERIMENT</span><h1>Wayfinder</h1></div>
+        <p>One agent. One objective. Continuous learning.</p>
+      </div>
+
+      <section class="world-panel panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">LIVE ENVIRONMENT</span><h2>Navigation field</h2></div>
+          <div class="world-legend"><span><i class="legend-agent"></i> Agent Five</span><span><i class="legend-goal"></i> Goal</span><span><i class="legend-obstacle"></i> Obstacle</span></div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="worldCanvas" aria-label="2D navigation environment with a red circular agent, green goal, and obstacles"></canvas>
+          <div class="canvas-hint" id="canvasHint">Select “Place obstacle” or “Move goal” to edit the field.</div>
+        </div>
+        <div class="world-controls">
+          <div class="button-group">
+            <button class="button primary" id="startBtn">▶ Start agent</button>
+            <button class="button secondary" id="pauseBtn" disabled>Ⅱ Pause</button>
+            <button class="button subtle" id="stopBtn" disabled>Stop</button>
+          </div>
+          <div class="button-group tools">
+            <button class="button tool" id="resetBtn">Reset agent</button>
+            <button class="button tool" id="layoutBtn">New layout</button>
+            <button class="button tool" id="obstacleBtn" aria-pressed="false">＋ Place obstacle</button>
+            <button class="button tool" id="goalBtn" aria-pressed="false">◎ Move goal</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="metrics-grid">
+        <article class="metric panel"><span>GOALS REACHED</span><strong id="goalCount">0</strong><small>Successful arrivals</small></article>
+        <article class="metric panel"><span>COLLISIONS</span><strong id="collisionCount">0</strong><small>Obstacle and boundary hits</small></article>
+        <article class="metric panel"><span>SIMULATION STEPS</span><strong id="stepCount">0</strong><small>Environment updates</small></article>
+        <article class="metric panel"><span>ENERGY</span><strong id="energyValue">100%</strong><div class="meter"><i id="energyMeter"></i></div></article>
+      </section>
+
+      <section class="panel console-panel">
+        <div class="panel-heading"><div><span class="eyebrow">NEXIUS RUNTIME</span><h2>Execution console</h2></div><button class="text-button" id="clearConsoleBtn">Clear</button></div>
+        <div id="consoleOutput" class="console-output" role="log" aria-live="polite"><p class="console-muted">Wayfinder runtime ready. Start the agent to compile and execute Wayfinder.nexius.</p></div>
+      </section>
+    </section>
+
+    <aside class="side-column">
+      <section class="panel status-panel">
+        <div class="panel-heading"><div><span class="eyebrow">MODEL STATUS</span><h2>Agent diagnostics</h2></div><span class="live-dot" id="liveDot"></span></div>
+        <div class="status-line"><span>Model</span><strong>Wayfinder</strong></div>
+        <div class="status-line"><span>Language</span><strong>Nexius</strong></div>
+        <div class="status-line"><span>Architecture</span><strong>10-15-15-14-14-10-10-8-4</strong></div>
+        <div class="status-line"><span>Movement</span><strong>Continuous X/Y thrust</strong></div>
+        <div class="status-line"><span>Training</span><strong id="trainingStatus">Enabled</strong></div>
+        <label class="toggle-row"><span><strong>Learning feedback</strong><small>Apply Nexius reward/correction signals</small></span><input type="checkbox" id="trainingToggle" checked><span class="toggle"></span></label>
+      </section>
+
+      <section class="panel network-panel">
+        <div class="panel-heading"><div><span class="eyebrow">NEURAL ARCHITECTURE</span><h2>Network topology</h2></div></div>
+        <div class="network-flow" aria-label="Neural network layers: 10, 15, 15, 14, 14, 10, 10, 8, 4">
+          <div class="layer-node"><b>10</b><small>INPUT</small></div><span></span>
+          <div class="layer-node"><b>15</b><small>H1</small></div><span></span>
+          <div class="layer-node"><b>15</b><small>H2</small></div><span></span>
+          <div class="layer-node"><b>14</b><small>H3</small></div><span></span>
+          <div class="layer-node"><b>14</b><small>H4</small></div><span></span>
+          <div class="layer-node"><b>10</b><small>H5</small></div><span></span>
+          <div class="layer-node"><b>10</b><small>H6</small></div><span></span>
+          <div class="layer-node"><b>8</b><small>H7</small></div><span></span>
+          <div class="layer-node output"><b>4</b><small>OUTPUT</small></div>
+        </div>
+        <p class="network-note">100 neurons · 1,223 weights · 90 biases · 1,313 trainable parameters</p>
+      </section>
+
+      <section class="panel telemetry-panel">
+        <div class="panel-heading"><div><span class="eyebrow">LIVE PERCEPTION</span><h2>Neural inputs</h2></div></div>
+        <div class="data-list" id="inputReadouts">
+          <div><span>Goal direction X</span><b id="inGoalX">0.00</b></div>
+          <div><span>Goal direction Y</span><b id="inGoalY">0.00</b></div>
+          <div><span>Goal distance</span><b id="inGoalDistance">0.00</b></div>
+          <div><span>Obstacle direction X</span><b id="inObstacleX">0.00</b></div>
+          <div><span>Obstacle direction Y</span><b id="inObstacleY">0.00</b></div>
+          <div><span>Obstacle distance</span><b id="inObstacleDistance">1.00</b></div>
+          <div><span>Velocity X</span><b id="inVelocityX">0.00</b></div>
+          <div><span>Velocity Y</span><b id="inVelocityY">0.00</b></div>
+          <div><span>Boundary proximity</span><b id="inBoundary">1.00</b></div>
+          <div><span>Energy level</span><b id="inEnergy">1.00</b></div>
+        </div>
+      </section>
+
+      <section class="panel telemetry-panel">
+        <div class="panel-heading"><div><span class="eyebrow">CONTINUOUS CONTROL</span><h2>Neural outputs</h2></div></div>
+        <div class="data-list output-list">
+          <div><span>Thrust X</span><b id="outThrustX">0.00</b></div>
+          <div><span>Thrust Y</span><b id="outThrustY">0.00</b></div>
+          <div><span>Braking</span><b id="outBrake">0.00</b></div>
+          <div><span>Avoidance gain</span><b id="outAvoidance">0.00</b></div>
+        </div>
+        <p class="small-note">The first three controls preserve Agent Five’s continuous thrust/braking style. The fourth output lets Wayfinder adapt obstacle-avoidance assistance.</p>
+      </section>
+
+      <section class="panel notes-panel">
+        <span class="eyebrow">MODEL IDENTITY</span>
+        <div class="identity-row"><span class="agent-swatch"></span><div><strong>Agent Five</strong><small>Canonical solid red circle</small></div></div>
+        <p>Wayfinder is a separate model line. It uses the Nexius neural module and does not modify Agent-Five-Nexus.</p>
+        <button class="text-button" id="exportBtn">Export run metrics ↗</button>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer"><span>ACIDIC / AGENT FIVE WAYFINDER</span><span>AFW-1.0.0 · Nexius-native prototype</span></footer>
+
+  <script src="vendor/nexius/neural.js"></script>
+  <script src="vendor/nexius/compiler.js"></script>
+  <script src="wayfinder.js"></script>
+</body>
+</html>
