@@ -292,12 +292,15 @@
   }
 
   function selectTimeoutWinner() {
-    const ranked=state.evolutionPopulation.map(candidate=>{
+    const weighted=state.evolutionPopulation.map(candidate=>{
       const progress=Number.isFinite(candidate.bestDistance)?Math.max(0,1-candidate.bestDistance/Math.hypot(WORLD.width,WORLD.height)):0;
-      const score=candidate.goalsCollected*100+progress*28-candidate.collisions*.35+Math.random()*18;
-      return {candidate,score};
-    }).sort((a,b)=>b.score-a.score);
-    return ranked[0].candidate;
+      const weight=Math.pow(candidate.goalsCollected+1,2)*(1+progress*.65)/(1+candidate.collisions*.015);
+      return {candidate,weight:Math.max(.01,weight)};
+    });
+    const total=weighted.reduce((sum,item)=>sum+item.weight,0);
+    let ticket=Math.random()*total;
+    for(const item of weighted){ticket-=item.weight;if(ticket<=0)return item.candidate;}
+    return weighted[weighted.length-1].candidate;
   }
 
   function beginNextGeneration(winner,reason) {
@@ -309,8 +312,15 @@
     const elitePolicy=clonePolicy(winner.policy);
     const count=state.evolutionPopulationSize;
     const mutationRate=reason==="timeout"?Math.min(.16,state.evolutionMutationRate*1.25):state.evolutionMutationRate;
-    const next=[];
-    next.push(createEvolutionCandidate(elitePolicy,0));
+    // Keep the actual winning candidate as the elite; reset its episode state,
+    // but preserve its identity and exact learned parameter checkpoint.
+    winner.x=START.x;winner.y=START.y;winner.vx=0;winner.vy=0;winner.energy=100;
+    winner.goal={x:state.goal.x,y:state.goal.y,radius:14};
+    winner.goalsCollected=0;winner.collisions=0;winner.steps=0;winner.elapsed=0;
+    winner.bestDistance=length(winner.goal.x-winner.x,winner.goal.y-winner.y);
+    winner.lastDistance=winner.bestDistance;winner.contactingSomething=false;
+    winner.isSuccessor=true;winner.index=0;
+    const next=[winner];
     for(let i=1;i<count;i++){
       const child=mutatePolicy(elitePolicy,mutationRate);
       next.push(createEvolutionCandidate(child,i));
