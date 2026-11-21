@@ -92,7 +92,7 @@
     return best;
   }
 
-  function updateSensors(vars) {
+  function updateSensors(vars, silent=false) {
     const a = state.agent, goal = state.goal;
     const gx=goal.x-a.x, gy=goal.y-a.y, gd=length(gx,gy)||1;
     const obstacle=nearestObstacle(), od=length(obstacle.dx,obstacle.dy)||1;
@@ -107,17 +107,19 @@
     const names = ["goalLocationX","goalLocationY","goalDistance","obstacleDirectionX","obstacleDirectionY","obstacleDistance","velocityX","velocityY","boundaryProximity","energyLevel","isContactingSomething"];
     names.forEach((name,i)=>{vars[name]=values[i];});
     state.lastInputs=values;
-    $("inGoalLocationX").textContent=values[0].toFixed(2);
-    $("inGoalLocationY").textContent=values[1].toFixed(2);
-    $("inGoalDistance").textContent=values[2].toFixed(2);
-    $("inObstacleX").textContent=values[3].toFixed(2);
-    $("inObstacleY").textContent=values[4].toFixed(2);
-    $("inObstacleDistance").textContent=values[5].toFixed(2);
-    $("inVelocityX").textContent=values[6].toFixed(2);
-    $("inVelocityY").textContent=values[7].toFixed(2);
-    $("inBoundary").textContent=values[8].toFixed(2);
-    $("inEnergy").textContent=values[9].toFixed(2);
-    $("inContact").textContent=values[10].toFixed(0);
+    if(!silent){
+          $("inGoalLocationX").textContent=values[0].toFixed(2);
+          $("inGoalLocationY").textContent=values[1].toFixed(2);
+          $("inGoalDistance").textContent=values[2].toFixed(2);
+          $("inObstacleX").textContent=values[3].toFixed(2);
+          $("inObstacleY").textContent=values[4].toFixed(2);
+          $("inObstacleDistance").textContent=values[5].toFixed(2);
+          $("inVelocityX").textContent=values[6].toFixed(2);
+          $("inVelocityY").textContent=values[7].toFixed(2);
+          $("inBoundary").textContent=values[8].toFixed(2);
+          $("inEnergy").textContent=values[9].toFixed(2);
+          $("inContact").textContent=values[10].toFixed(0);
+    }
     return values;
   }
 
@@ -226,7 +228,7 @@
     const savedAgent=state.agent,savedGoal=state.goal;
     state.agent=candidate;state.goal=candidate.goal;
     const vars=Object.create(null);
-    updateSensors(vars);
+    updateSensors(vars,true);
     state.agent=savedAgent;state.goal=savedGoal;
     return vars;
   }
