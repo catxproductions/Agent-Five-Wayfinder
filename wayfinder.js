@@ -148,7 +148,7 @@
   }
 
   function applyFrame(vars, seconds) {
-    if(paused||stopRequested)return;
+    if(paused||stopRequested){vars.feedbackSignal=0;return;}
     const dt=clamp(Number(seconds)||0.02,0.008,0.04);
     state.feedbackCooldown=Math.max(0,state.feedbackCooldown-dt);
     const a=state.agent;
