@@ -1,0 +1,71 @@
+,,, AGENT-FIVE-WAYFINDER 1.0.0
+,,, Nexius-native decision loop.
+,,, The environment updates these variables through the runtime frame hook.
+
+imp.neural
+
+goalDirectionX = 0
+goalDirectionY = 0
+goalDistance = 1
+obstacleDirectionX = 0
+obstacleDirectionY = 0
+obstacleDistance = 1
+velocityX = 0
+velocityY = 0
+boundaryProximity = 1
+energyLevel = 1
+
+thrustX = 0.5
+thrustY = 0.5
+braking = 0
+avoidanceGain = 0.5
+
+feedbackSignal = 0
+feedbackStrength = 0.2
+aiEnabled = true
+
+neural.Wayfinder.inputLayer -- (10):
+    neural.in1 = goalDirectionX
+    neural.in2 = goalDirectionY
+    neural.in3 = goalDistance
+    neural.in4 = obstacleDirectionX
+    neural.in5 = obstacleDirectionY
+    neural.in6 = obstacleDistance
+    neural.in7 = velocityX
+    neural.in8 = velocityY
+    neural.in9 = boundaryProximity
+    neural.in10 = energyLevel
+--
+
+neural.Wayfinder.hidden -- (7):
+    neural.HL1(15)
+    neural.HL2(15)
+    neural.HL3(14)
+    neural.HL4(14)
+    neural.HL5(10)
+    neural.HL6(10)
+    neural.HL7(8)
+--
+
+neural.Wayfinder.outputLayer -- (4):
+    neural.out1 = thrustX
+    neural.out2 = thrustY
+    neural.out3 = braking
+    neural.out4 = avoidanceGain
+--
+
+neural.assemble(Wayfinder)
+output("Wayfinder 1.0.0 neural network assembled.")
+output("Topology: 10-15-15-14-14-10-10-8-4.")
+
+while -- aiEnabled == true:
+    neural.run(Wayfinder)
+    wait(0.02)
+    neural.observe(Wayfinder)
+
+    if -- feedbackSignal > 0.05:
+        neural.reward(Wayfinder, feedbackStrength)
+    -- ELIF -- feedbackSignal < -0.05:
+        neural.correct(Wayfinder, feedbackStrength)
+    --
+--
