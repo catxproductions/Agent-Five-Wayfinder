@@ -61,7 +61,7 @@
           <div><span>Completed generations</span><b id="evolutionCompleted">0</b></div>
         </div>
         <div class="population-wrap"><canvas id="populationCanvas" aria-label="Live overview of the evolutionary agent population"></canvas></div>
-        <p class="small-note">First agent to 5 goals becomes the elite. If no agent succeeds in 120 seconds, selection favors goal progress, then lower collision counts. The elite is retained unchanged; the rest are mutated descendants.</p>
+        <p class="small-note">Each agent has its own independently randomized obstacles and goal. The first to collect 5 goals becomes the successor. After 120 seconds, selection ranks by goals collected, measured goal progress, then remaining energy. The unchanged elite is retained; all others are mutated descendants. An agent that has collected a goal cannot be eliminated by energy depletion.</p>
       </section>
 
       <section class="metrics-grid">
