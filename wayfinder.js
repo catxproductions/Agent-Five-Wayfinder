@@ -21,6 +21,8 @@
   let frameCount = 0;
   let lastTelemetry = {};
   let resizeObserver = null;
+  let activeNeuralRuntime = null;
+  let nextEvolutionAgentId = 1;
 
   const state = {
     agent: { x: START.x, y: START.y, vx: 0, vy: 0, radius: 11, energy: 100, contactingSomething: false },
@@ -28,7 +30,19 @@
     goals: 0, collisions: 0, steps: 0, elapsed: 0,
     lastDistance: 0, feedbackCooldown: 0, goalCooldown: 0,
     training: true, lastOutput: [0.5,0.5,0,0.5], lastInputs: Array(11).fill(0),
-    distanceAtStart: 0, bestDistance: Infinity
+    distanceAtStart: 0, bestDistance: Infinity,
+    evolutionEnabled: false,
+    evolutionPopulationSize: 15,
+    evolutionGeneration: 0,
+    evolutionElapsed: 0,
+    evolutionPopulation: [],
+    evolutionSuccessorId: null,
+    evolutionLastWinnerId: null,
+    evolutionCompleted: 0,
+    evolutionMutationRate: 0.075,
+    evolutionMutationScale: 0.22,
+    evolutionBestGoals: 0,
+    evolutionBestDistance: Infinity
   };
 
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -149,9 +163,243 @@
     return {x:WORLD.width-75,y:WORLD.height-70};
   }
 
+
+  function clonePolicy(policy) {
+    return {
+      sizes: policy.sizes.slice(),
+      weights: policy.weights.map(layer=>layer.map(row=>row.slice())),
+      biases: policy.biases.map(layer=>layer.slice())
+    };
+  }
+
+  function gaussianNoise() {
+    const u=Math.max(1e-12,Math.random()),v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  function mutatePolicy(source, rate=state.evolutionMutationRate) {
+    const copy=clonePolicy(source);
+    for(const layer of copy.weights)for(const row of layer)for(let i=0;i<row.length;i++){
+      if(Math.random()<rate)row[i]=clamp(row[i]+gaussianNoise()*state.evolutionMutationScale,-8,8);
+    }
+    for(const layer of copy.biases)for(let i=0;i<layer.length;i++){
+      if(Math.random()<rate)layer[i]=clamp(layer[i]+gaussianNoise()*state.evolutionMutationScale,-8,8);
+    }
+    return copy;
+  }
+
+  function createEvolutionCandidate(policy, index) {
+    const start={x:clamp(START.x+(Math.random()-.5)*24,35,WORLD.width-35),y:clamp(START.y+(Math.random()-.5)*24,35,WORLD.height-35)};
+    return {
+      id:nextEvolutionAgentId++,
+      policy:clonePolicy(policy),
+      x:start.x,y:start.y,vx:0,vy:0,radius:11,energy:100,
+      goal:{x:state.goal.x,y:state.goal.y,radius:14},
+      goalsCollected:0,collisions:0,steps:0,elapsed:0,
+      bestDistance:Infinity,lastDistance:Infinity,
+      contactingSomething:false,isSuccessor:false,
+      fitness:0,index
+    };
+  }
+
+  function seedEvolutionPopulation(runtime) {
+    const base=runtime.exportWeights("Wayfinder");
+    const count=clamp(Math.round(Number($("evolutionPopulationSize").value)||15),15,300);
+    state.evolutionPopulationSize=count;
+    state.evolutionPopulation=[];
+    state.evolutionGeneration=1;
+    state.evolutionElapsed=0;
+    state.evolutionSuccessorId=null;
+    state.evolutionLastWinnerId=null;
+    state.evolutionCompleted=0;
+    state.evolutionBestGoals=0;
+    state.evolutionBestDistance=Infinity;
+    for(let i=0;i<count;i++){
+      const policy=i===0?clonePolicy(base):mutatePolicy(base,0.18);
+      state.evolutionPopulation.push(createEvolutionCandidate(policy,i));
+    }
+    addConsole("Evolution initialized: "+count+" agents in generation 1.");
+    updateEvolutionReadouts();
+  }
+
+  function candidateSensors(candidate) {
+    const savedAgent=state.agent,savedGoal=state.goal;
+    state.agent=candidate;state.goal=candidate.goal;
+    const vars=Object.create(null);
+    updateSensors(vars);
+    state.agent=savedAgent;state.goal=savedGoal;
+    return vars;
+  }
+
+  function candidateStep(candidate,dt,runtime) {
+    runtime.importWeights("Wayfinder",candidate.policy);
+    const vars=candidateSensors(candidate);
+    const outputs=runtime.run("Wayfinder",vars);
+    runtime.observe("Wayfinder");
+    const tx=clamp((Number(vars.thrustX)||0.5)*2-1,-1,1);
+    const ty=clamp((Number(vars.thrustY)||0.5)*2-1,-1,1);
+    const brake=clamp(Number(vars.braking)||0,0,1);
+    const avoidance=clamp(Number(vars.avoidanceGain)||0.5,0,1);
+    const savedAgent=state.agent,savedGoal=state.goal;
+    state.agent=candidate;state.goal=candidate.goal;
+    const sensor=nearestObstacle();
+    let ax=tx,ay=ty;
+    if(sensor.clearance<125){
+      const away=normalized(-sensor.dx,-sensor.dy);
+      const urgency=clamp((125-sensor.clearance)/125,0,1);
+      ax+=away.x*urgency*avoidance*1.25;
+      ay+=away.y*urgency*avoidance*1.25;
+    }
+    const magnitude=length(ax,ay);
+    if(magnitude>1.45){ax=ax/magnitude*1.45;ay=ay/magnitude*1.45;}
+    const before=distanceToGoal();
+    candidate.vx+=ax*165*dt;candidate.vy+=ay*165*dt;
+    const drag=Math.pow(0.985,dt*60)*Math.exp(-6.5*brake*dt);
+    candidate.vx*=drag;candidate.vy*=drag;
+    const speed=length(candidate.vx,candidate.vy);
+    if(speed>210){candidate.vx=candidate.vx/speed*210;candidate.vy=candidate.vy/speed*210;}
+    candidate.x+=candidate.vx*dt;candidate.y+=candidate.vy*dt;
+    let hit=false;
+    for(const box of obstacles)if(collideWithObstacle(box))hit=true;
+    const r=candidate.radius;
+    if(candidate.x<r){candidate.x=r;candidate.vx=Math.abs(candidate.vx)*.35;hit=true;}
+    if(candidate.x>WORLD.width-r){candidate.x=WORLD.width-r;candidate.vx=-Math.abs(candidate.vx)*.35;hit=true;}
+    if(candidate.y<r){candidate.y=r;candidate.vy=Math.abs(candidate.vy)*.35;hit=true;}
+    if(candidate.y>WORLD.height-r){candidate.y=WORLD.height-r;candidate.vy=-Math.abs(candidate.vy)*.35;hit=true;}
+    candidate.contactingSomething=hit||distanceToGoal()<=candidate.radius+candidate.goal.radius;
+    if(hit)candidate.collisions++;
+    const after=distanceToGoal();
+    candidate.lastDistance=after;
+    candidate.bestDistance=Math.min(candidate.bestDistance,after);
+    candidate.energy=Math.max(0,candidate.energy-(.09+.12*(Math.abs(ax)+Math.abs(ay)))*dt);
+    candidate.steps++;candidate.elapsed+=dt;
+    let feedback=0,strength=.2;
+    if(hit){feedback=-1;strength=.8;}
+    else if(before-after>.45){feedback=1;strength=.25;}
+    if(after<candidate.radius+candidate.goal.radius){
+      candidate.goalsCollected++;
+      candidate.energy=Math.min(100,candidate.energy+28);
+      candidate.goal=randomFreePoint(45);
+      candidate.goal.radius=14;
+      feedback=1;strength=1;
+      candidate.lastDistance=distanceToGoal();
+    }
+    if(state.training&&feedback>0)runtime.reward("Wayfinder",strength);
+    else if(state.training&&feedback<0)runtime.correct("Wayfinder",strength);
+    candidate.policy=runtime.exportWeights("Wayfinder");
+    state.agent=savedAgent;state.goal=savedGoal;
+    return candidate.goalsCollected;
+  }
+
+  function selectTimeoutWinner() {
+    const ranked=state.evolutionPopulation.map(candidate=>{
+      const progress=Number.isFinite(candidate.bestDistance)?Math.max(0,1-candidate.bestDistance/Math.hypot(WORLD.width,WORLD.height)):0;
+      const score=candidate.goalsCollected*100+progress*28-candidate.collisions*.35+Math.random()*18;
+      return {candidate,score};
+    }).sort((a,b)=>b.score-a.score);
+    return ranked[0].candidate;
+  }
+
+  function beginNextGeneration(winner,reason) {
+    if(!winner)return;
+    winner.isSuccessor=true;
+    state.evolutionSuccessorId=winner.id;
+    state.evolutionLastWinnerId=winner.id;
+    state.evolutionCompleted++;
+    const elitePolicy=clonePolicy(winner.policy);
+    const count=state.evolutionPopulationSize;
+    const mutationRate=reason==="timeout"?Math.min(.16,state.evolutionMutationRate*1.25):state.evolutionMutationRate;
+    const next=[];
+    next.push(createEvolutionCandidate(elitePolicy,0));
+    for(let i=1;i<count;i++){
+      const child=mutatePolicy(elitePolicy,mutationRate);
+      next.push(createEvolutionCandidate(child,i));
+    }
+    state.evolutionPopulation=next;
+    state.evolutionGeneration++;
+    state.evolutionElapsed=0;
+    state.evolutionBestGoals=0;
+    state.evolutionBestDistance=Infinity;
+    addConsole("Generation "+(state.evolutionGeneration-1)+" successor: Agent #"+winner.id+
+      " ("+winner.goalsCollected+" goals). "+reason+". Elite retained; "+(count-1)+" mutated descendants created.","console-good");
+    updateEvolutionReadouts();
+  }
+
+  function updateEvolutionReadouts() {
+    const population=state.evolutionPopulation;
+    const best=population.reduce((a,b)=>!a||b.goalsCollected>a.goalsCollected||
+      (b.goalsCollected===a.goalsCollected&&b.bestDistance<a.bestDistance)?b:a,null);
+    $("evolutionGeneration").textContent=String(state.evolutionGeneration||0);
+    $("evolutionPopulationCount").textContent=population.length+" / "+state.evolutionPopulationSize;
+    $("evolutionElapsed").textContent=Math.floor(state.evolutionElapsed)+"s / 120s";
+    $("evolutionWinner").textContent=state.evolutionSuccessorId===null?"Searching":("Elite #"+state.evolutionSuccessorId);
+    $("evolutionBest").textContent=best?("#"+best.id+" · "+best.goalsCollected+" goals"):"—";
+    $("evolutionCompleted").textContent=String(state.evolutionCompleted);
+    drawEvolutionPopulation();
+  }
+
+  function drawEvolutionPopulation() {
+    const population=state.evolutionPopulation;
+    const target=$("populationCanvas");
+    if(!target||!target.getContext)return;
+    const draw=target.getContext("2d");
+    const columns=Math.min(10,Math.max(3,Math.ceil(Math.sqrt(population.length))));
+    const rows=Math.ceil(population.length/columns);
+    const tileW=92,tileH=64,gap=5,pad=8;
+    target.width=pad*2+columns*(tileW+gap)-gap;
+    target.height=pad*2+rows*(tileH+gap)-gap;
+    draw.fillStyle="#0c1219";draw.fillRect(0,0,target.width,target.height);
+    population.forEach((agent,index)=>{
+      const x=pad+(index%columns)*(tileW+gap),y=pad+Math.floor(index/columns)*(tileH+gap);
+      draw.fillStyle=agent.isSuccessor?"#342c17":"#17222e";
+      draw.fillRect(x,y,tileW,tileH);
+      draw.strokeStyle=agent.isSuccessor?"#e5bd4f":"#34465a";draw.lineWidth=1;draw.strokeRect(x+.5,y+.5,tileW-1,tileH-1);
+      draw.fillStyle="#b9c8d8";draw.font="10px ui-monospace,monospace";draw.fillText("#"+agent.id,x+6,y+12);
+      draw.fillStyle="#74d8bd";draw.fillText(agent.goalsCollected+" / 5",x+tileW-31,y+12);
+      draw.fillStyle="#ef343b";draw.beginPath();
+      draw.arc(x+6+(agent.x/WORLD.width)*(tileW-12),y+20+(agent.y/WORLD.height)*(tileH-28),3.2,0,Math.PI*2);draw.fill();
+      draw.fillStyle="#3a4a5d";draw.fillRect(x+6,y+tileH-8,tileW-12,3);
+      draw.fillStyle=agent.energy<25?"#e87979":"#74d8bd";
+      draw.fillRect(x+6,y+tileH-8,(tileW-12)*agent.energy/100,3);
+    });
+  }
+
+  function applyEvolutionFrame(vars,seconds) {
+    const runtime=activeNeuralRuntime;
+    if(!runtime){vars.feedbackSignal=0;return;}
+    const dt=clamp(Number(seconds)||.02,.008,.04);
+    if(!state.evolutionPopulation.length)seedEvolutionPopulation(runtime);
+    state.evolutionElapsed+=dt;
+    let winner=null;
+    for(const candidate of state.evolutionPopulation){
+      candidateStep(candidate,dt,runtime);
+      if(candidate.goalsCollected>=5){winner=candidate;break;}
+      if(candidate.goalsCollected>state.evolutionBestGoals)state.evolutionBestGoals=candidate.goalsCollected;
+      state.evolutionBestDistance=Math.min(state.evolutionBestDistance,candidate.bestDistance);
+    }
+    if(winner)beginNextGeneration(winner,"goal threshold reached");
+    else if(state.evolutionElapsed>=120)beginNextGeneration(selectTimeoutWinner(),"120-second generation timeout");
+    const best=state.evolutionPopulation.reduce((a,b)=>!a||b.goalsCollected>a.goalsCollected||
+      (b.goalsCollected===a.goalsCollected&&b.bestDistance<a.bestDistance)?b:a,null);
+    if(best){
+      state.agent=best;state.goal=best.goal;
+      state.goals=best.goalsCollected;state.collisions=best.collisions;
+      state.steps=best.steps;state.elapsed=best.elapsed;
+      $("goalCount").textContent=String(best.goalsCollected);
+      $("collisionCount").textContent=String(best.collisions);
+      $("stepCount").textContent=best.steps.toLocaleString();
+      $("energyValue").textContent=Math.round(best.energy)+"%";
+      $("energyMeter").style.width=best.energy+"%";
+      drawWorld();
+    }
+    vars.feedbackSignal=0;vars.feedbackStrength=0;
+    updateEvolutionReadouts();
+  }
+
   function applyFrame(vars, seconds) {
     if(paused||stopRequested){vars.feedbackSignal=0;return;}
     const dt=clamp(Number(seconds)||0.02,0.008,0.04);
+    if(state.evolutionEnabled){applyEvolutionFrame(vars,dt);return;}
     state.feedbackCooldown=Math.max(0,state.feedbackCooldown-dt);
     const a=state.agent;
     updateOutputReadouts(vars);
@@ -280,6 +528,8 @@
   function resetAgent(){
     state.agent={x:START.x,y:START.y,vx:0,vy:0,radius:11,energy:100,contactingSomething:false};
     state.goals=0;state.collisions=0;state.steps=0;state.elapsed=0;state.feedbackCooldown=0;
+    state.evolutionPopulation=[];state.evolutionGeneration=0;state.evolutionElapsed=0;
+    state.evolutionSuccessorId=null;state.evolutionLastWinnerId=null;state.evolutionCompleted=0;
     state.lastDistance=distanceToGoal();state.bestDistance=state.lastDistance;
     $("goalCount").textContent="0";$("collisionCount").textContent="0";$("stepCount").textContent="0";
     $("energyValue").textContent="100%";$("energyMeter").style.width="100%";
@@ -312,8 +562,10 @@
       $("pauseBtn").textContent="Ⅱ Pause";setRuntime("RUNNING");
       addConsole("Compiling Wayfinder.nexius...");
       addConsole("Nexius compilation successful. "+compiled.instructionCount+" instructions parsed.","console-good");
+      activeNeuralRuntime=null;
       lastRunResult=await window.NexiusCompiler.run(compiled,{
         output:value=>addConsole(value),
+        onNeuralRuntime:runtime=>{activeNeuralRuntime=runtime;},
         isStopped:()=>stopRequested,
         onFrame:(vars,seconds)=>{
           if(stopRequested)return;
@@ -354,6 +606,7 @@
     const data={
       model:"Agent-Five-Wayfinder",version:"1.0.0",topology:[11,15,15,14,14,10,10,8,4],
       appearance:"solid red circle",movement:"continuous X/Y thrust with braking",
+      evolution:{enabled:state.evolutionEnabled,generation:state.evolutionGeneration,populationSize:state.evolutionPopulationSize,completedGenerations:state.evolutionCompleted,eliteAgentId:state.evolutionSuccessorId},
       metrics:{goals:state.goals,collisions:state.collisions,steps:state.steps,elapsedSeconds:Number(state.elapsed.toFixed(2)),energy:state.agent.energy},
       note:"This export contains run metrics only. The current Nexius neural module does not expose model-weight serialization."
     };
@@ -370,6 +623,16 @@
   $("obstacleBtn").addEventListener("click",()=>{editMode=editMode==="obstacle"?"":"obstacle";updateModeButtons();drawWorld();});
   $("goalBtn").addEventListener("click",()=>{editMode=editMode==="goal"?"":"goal";updateModeButtons();drawWorld();});
   $("trainingToggle").addEventListener("change",event=>{state.training=event.target.checked;$("trainingStatus").textContent=state.training?"Enabled":"Disabled";});
+  $("evolutionToggle").addEventListener("change",event=>{
+    state.evolutionEnabled=event.target.checked;
+    $("evolutionStatus").textContent=state.evolutionEnabled?"Generational mode":"Single-agent mode";
+    if(state.evolutionEnabled)addConsole("Generational training selected. Population starts when the agent runs.");
+    else addConsole("Single-agent mode selected.");
+  });
+  $("evolutionPopulationSize").addEventListener("change",event=>{
+    const value=clamp(Math.round(Number(event.target.value)||15),15,300);
+    event.target.value=String(value);state.evolutionPopulationSize=value;
+  });
   $("clearConsoleBtn").addEventListener("click",()=>$("consoleOutput").replaceChildren());
   $("exportBtn").addEventListener("click",exportMetrics);
   state.lastDistance=distanceToGoal();
@@ -377,5 +640,7 @@
   window.addEventListener("resize",resizeCanvas);
   resizeCanvas();updateModeButtons();drawWorld();
   addConsole("AFW-1.0.0 initialized. The red circle is Agent Five.");
-  addConsole("Nexius source: Wayfinder.nexius · Neural layers: 10-15-15-14-14-10-10-8-4");
+  $("evolutionStatus").textContent="Single-agent mode";
+  updateEvolutionReadouts();
+  addConsole("Nexius source: Wayfinder.nexius · Neural layers: 11-15-15-14-14-10-10-8-4");
 })();
