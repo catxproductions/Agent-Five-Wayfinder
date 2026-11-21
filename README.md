@@ -23,9 +23,9 @@ Agent Five is represented by its canonical **solid red circle**. Wayfinder prese
 - Hidden layers: 15, 15, 14, 14, 10, 10, 8.
 - Output: 4 continuous controls.
 - Total neurons: 101.
-- Weights: 1,238.
+- Weights: 1,148.
 - Biases: 90.
-- Trainable parameters: 1,328.
+- Trainable parameters: 1,238.
 
 ## Current limitations
 
