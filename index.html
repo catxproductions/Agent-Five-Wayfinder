@@ -66,7 +66,7 @@
         <div class="panel-heading"><div><span class="eyebrow">MODEL STATUS</span><h2>Agent diagnostics</h2></div><span class="live-dot" id="liveDot"></span></div>
         <div class="status-line"><span>Model</span><strong>Wayfinder</strong></div>
         <div class="status-line"><span>Language</span><strong>Nexius</strong></div>
-        <div class="status-line"><span>Architecture</span><strong>10-15-15-14-14-10-10-8-4</strong></div>
+        <div class="status-line"><span>Architecture</span><strong>11-15-15-14-14-10-10-8-4</strong></div>
         <div class="status-line"><span>Movement</span><strong>Continuous X/Y thrust</strong></div>
         <div class="status-line"><span>Training</span><strong id="trainingStatus">Enabled</strong></div>
         <label class="toggle-row"><span><strong>Learning feedback</strong><small>Apply Nexius reward/correction signals</small></span><input type="checkbox" id="trainingToggle" checked><span class="toggle"></span></label>
@@ -74,8 +74,8 @@
 
       <section class="panel network-panel">
         <div class="panel-heading"><div><span class="eyebrow">NEURAL ARCHITECTURE</span><h2>Network topology</h2></div></div>
-        <div class="network-flow" aria-label="Neural network layers: 10, 15, 15, 14, 14, 10, 10, 8, 4">
-          <div class="layer-node"><b>10</b><small>INPUT</small></div><span></span>
+        <div class="network-flow" aria-label="Neural network layers: 11, 15, 15, 14, 14, 10, 10, 8, 4">
+          <div class="layer-node"><b>11</b><small>INPUT</small></div><span></span>
           <div class="layer-node"><b>15</b><small>H1</small></div><span></span>
           <div class="layer-node"><b>15</b><small>H2</small></div><span></span>
           <div class="layer-node"><b>14</b><small>H3</small></div><span></span>
@@ -85,14 +85,14 @@
           <div class="layer-node"><b>8</b><small>H7</small></div><span></span>
           <div class="layer-node output"><b>4</b><small>OUTPUT</small></div>
         </div>
-        <p class="network-note">100 neurons · 1,223 weights · 90 biases · 1,313 trainable parameters</p>
+        <p class="network-note">101 neurons · 1,238 weights · 90 biases · 1,328 trainable parameters</p>
       </section>
 
       <section class="panel telemetry-panel">
         <div class="panel-heading"><div><span class="eyebrow">LIVE PERCEPTION</span><h2>Neural inputs</h2></div></div>
         <div class="data-list" id="inputReadouts">
-          <div><span>Goal direction X</span><b id="inGoalX">0.00</b></div>
-          <div><span>Goal direction Y</span><b id="inGoalY">0.00</b></div>
+          <div><span>Goal location X</span><b id="inGoalLocationX">0.00</b></div>
+          <div><span>Goal location Y</span><b id="inGoalLocationY">0.00</b></div>
           <div><span>Goal distance</span><b id="inGoalDistance">0.00</b></div>
           <div><span>Obstacle direction X</span><b id="inObstacleX">0.00</b></div>
           <div><span>Obstacle direction Y</span><b id="inObstacleY">0.00</b></div>
@@ -101,6 +101,7 @@
           <div><span>Velocity Y</span><b id="inVelocityY">0.00</b></div>
           <div><span>Boundary proximity</span><b id="inBoundary">1.00</b></div>
           <div><span>Energy level</span><b id="inEnergy">1.00</b></div>
+          <div><span>isContactingSomething</span><b id="inContact">0</b></div>
         </div>
       </section>
 
