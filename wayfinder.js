@@ -23,11 +23,11 @@
   let resizeObserver = null;
 
   const state = {
-    agent: { x: START.x, y: START.y, vx: 0, vy: 0, radius: 11, energy: 100 },
+    agent: { x: START.x, y: START.y, vx: 0, vy: 0, radius: 11, energy: 100, contactingSomething: false },
     goal: { x: 855, y: 500, radius: 14 },
     goals: 0, collisions: 0, steps: 0, elapsed: 0,
     lastDistance: 0, feedbackCooldown: 0, goalCooldown: 0,
-    training: true, lastOutput: [0.5,0.5,0,0.5], lastInputs: Array(10).fill(0),
+    training: true, lastOutput: [0.5,0.5,0,0.5], lastInputs: Array(11).fill(0),
     distanceAtStart: 0, bestDistance: Infinity
   };
 
@@ -82,18 +82,19 @@
     const a = state.agent, goal = state.goal;
     const gx=goal.x-a.x, gy=goal.y-a.y, gd=length(gx,gy)||1;
     const obstacle=nearestObstacle(), od=length(obstacle.dx,obstacle.dy)||1;
+    const isContactingSomething = a.contactingSomething ? 1 : 0;
     const boundary=Math.min(a.x,a.y,WORLD.width-a.x,WORLD.height-a.y)-a.radius;
     const values = [
-      gx/gd, gy/gd, clamp(gd/Math.hypot(WORLD.width,WORLD.height),0,1),
+      clamp(goal.x/WORLD.width,0,1), clamp(goal.y/WORLD.height,0,1), clamp(gd/Math.hypot(WORLD.width,WORLD.height),0,1),
       obstacle.dx/od, obstacle.dy/od, clamp(obstacle.clearance/240,0,1),
       clamp(a.vx/210,-1,1), clamp(a.vy/210,-1,1),
-      clamp(boundary/170,0,1), clamp(a.energy/100,0,1)
+      clamp(boundary/170,0,1), clamp(a.energy/100,0,1), isContactingSomething
     ];
-    const names = ["goalDirectionX","goalDirectionY","goalDistance","obstacleDirectionX","obstacleDirectionY","obstacleDistance","velocityX","velocityY","boundaryProximity","energyLevel"];
+    const names = ["goalLocationX","goalLocationY","goalDistance","obstacleDirectionX","obstacleDirectionY","obstacleDistance","velocityX","velocityY","boundaryProximity","energyLevel","isContactingSomething"];
     names.forEach((name,i)=>{vars[name]=values[i];});
     state.lastInputs=values;
-    $("inGoalX").textContent=values[0].toFixed(2);
-    $("inGoalY").textContent=values[1].toFixed(2);
+    $("inGoalLocationX").textContent=values[0].toFixed(2);
+    $("inGoalLocationY").textContent=values[1].toFixed(2);
     $("inGoalDistance").textContent=values[2].toFixed(2);
     $("inObstacleX").textContent=values[3].toFixed(2);
     $("inObstacleY").textContent=values[4].toFixed(2);
@@ -102,6 +103,7 @@
     $("inVelocityY").textContent=values[7].toFixed(2);
     $("inBoundary").textContent=values[8].toFixed(2);
     $("inEnergy").textContent=values[9].toFixed(2);
+    $("inContact").textContent=values[10].toFixed(0);
     return values;
   }
 
@@ -180,6 +182,7 @@
     if(a.x>WORLD.width-r){a.x=WORLD.width-r;a.vx=-Math.abs(a.vx)*0.35;hit=true;}
     if(a.y<r){a.y=r;a.vy=Math.abs(a.vy)*0.35;hit=true;}
     if(a.y>WORLD.height-r){a.y=WORLD.height-r;a.vy=-Math.abs(a.vy)*0.35;hit=true;}
+    a.contactingSomething=hit;
     if(hit){
       state.collisions++;
       vars.feedbackSignal=state.training&&state.feedbackCooldown<=0?-1:0;
@@ -274,7 +277,7 @@
   });
 
   function resetAgent(){
-    state.agent={x:START.x,y:START.y,vx:0,vy:0,radius:11,energy:100};
+    state.agent={x:START.x,y:START.y,vx:0,vy:0,radius:11,energy:100,contactingSomething:false};
     state.goals=0;state.collisions=0;state.steps=0;state.elapsed=0;state.feedbackCooldown=0;
     state.lastDistance=distanceToGoal();state.bestDistance=state.lastDistance;
     $("goalCount").textContent="0";$("collisionCount").textContent="0";$("stepCount").textContent="0";
@@ -348,7 +351,7 @@
 
   function exportMetrics(){
     const data={
-      model:"Agent-Five-Wayfinder",version:"1.0.0",topology:[10,15,15,14,14,10,10,8,4],
+      model:"Agent-Five-Wayfinder",version:"1.0.0",topology:[11,15,15,14,14,10,10,8,4],
       appearance:"solid red circle",movement:"continuous X/Y thrust with braking",
       metrics:{goals:state.goals,collisions:state.collisions,steps:state.steps,elapsedSeconds:Number(state.elapsed.toFixed(2)),energy:state.agent.energy},
       note:"This export contains run metrics only. The current Nexius neural module does not expose model-weight serialization."
