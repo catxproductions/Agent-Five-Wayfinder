@@ -296,8 +296,11 @@
       candidate.energy=Math.min(100,candidate.energy+28);
       candidate.goal=randomFreePoint(45,candidate.obstacles,candidate);
       candidate.goal.radius=14;
+      // Start measuring progress against the newly assigned target.
+      candidate.initialDistance=length(candidate.goal.x-candidate.x,candidate.goal.y-candidate.y);
+      candidate.bestDistance=candidate.initialDistance;
+      candidate.lastDistance=candidate.initialDistance;
       feedback=1;strength=1;
-      candidate.lastDistance=length(candidate.goal.x-candidate.x,candidate.goal.y-candidate.y);
     }
     // Zero energy only eliminates an agent before its first successful goal.
     if(candidate.energy<=0&&candidate.goalsCollected===0)candidate.eliminated=true;
